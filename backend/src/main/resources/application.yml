@@ -1,0 +1,84 @@
+# Settings come from environment variables. For local development they can
+# also live in a .env file in the repo root (see .env.example), which is
+# imported below; real environment variables take precedence.
+spring:
+  application:
+    name: equiptrack
+  profiles:
+    default: dev
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/equiptrack}
+    username: ${DB_USERNAME:equiptrack}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate # Flyway owns the schema
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    locations: classpath:db/migration
+
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /api
+  error:
+    include-stacktrace: never
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SWAGGER_ENABLED:true}
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}         # at least 32 bytes (256 bits)
+    ttl: 8h
+  mrn:
+    hash-key: ${MRN_HASH_KEY}     # HMAC key for hashing full MRNs
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  login:
+    max-failed-attempts: 5
+    lock-duration: 15m
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  flyway:
+    # Dev-only seed data lives in its own folder so prod never loads it
+    locations: classpath:db/migration,classpath:db/dev-seed
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+springdoc:
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
