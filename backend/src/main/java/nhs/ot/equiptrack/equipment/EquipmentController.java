@@ -5,13 +5,17 @@ import java.util.List;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import nhs.ot.equiptrack.auth.CurrentUser;
@@ -23,10 +27,46 @@ class EquipmentController {
 	record ReturnRequest(@NotNull(message = "Say whether the item is clean and undamaged") Boolean clean) {
 	}
 
-	private final EquipmentService service;
+	// pool is a funding pool code (GET /pools); location defaults to the OT store
+	record RegisterRequest(String type, String pool, String location,
+			@NotNull(message = "Enter the item's details") @Valid EquipmentDetails details) {
+	}
 
-	EquipmentController(EquipmentService service) {
+	record UpdateRequest(String pool, @NotNull(message = "Enter the item's details") @Valid EquipmentDetails details) {
+	}
+
+	private final EquipmentService service;
+	private final EquipmentRegistry registry;
+
+	EquipmentController(EquipmentService service, EquipmentRegistry registry) {
 		this.service = service;
+		this.registry = registry;
+	}
+
+	@PostMapping
+	@PreAuthorize("hasRole('MANAGER')")
+	@ResponseStatus(HttpStatus.CREATED)
+	EquipmentRegistry.DetailsResponse register(@AuthenticationPrincipal CurrentUser user, @Valid @RequestBody RegisterRequest request) {
+		return registry.register(user, request.type(), request.pool(), request.location(), request.details());
+	}
+
+	@GetMapping("/{id}/details")
+	EquipmentRegistry.DetailsResponse details(@PathVariable String id) {
+		return registry.details(id);
+	}
+
+	@PutMapping("/{id}")
+	@PreAuthorize("hasRole('MANAGER')")
+	EquipmentRegistry.DetailsResponse update(@AuthenticationPrincipal CurrentUser user, @PathVariable String id,
+			@Valid @RequestBody UpdateRequest request) {
+		return registry.update(user, id, request.pool(), request.details());
+	}
+
+	// Called when a label is printed or reprinted, so the activity log records it
+	@PostMapping("/{id}/label-printed")
+	@PreAuthorize("hasRole('MANAGER')")
+	EquipmentRegistry.DetailsResponse labelPrinted(@AuthenticationPrincipal CurrentUser user, @PathVariable String id) {
+		return registry.labelPrinted(user, id);
 	}
 
 	// All filters optional; search matches ID, name, asset number, serial number or model

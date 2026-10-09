@@ -21,9 +21,23 @@ public class EquipmentType {
 
 	private int defaultLoanDays;
 
+	private String labelPrefix;
+
 	private int sortOrder;
 
 	protected EquipmentType() {
+	}
+
+	EquipmentType(String name, EquipmentCategory category, String labelPrefix, int defaultLoanDays) {
+		this.name = name;
+		this.category = category;
+		this.labelPrefix = labelPrefix;
+		this.defaultLoanDays = defaultLoanDays;
+		this.sortOrder = 100;
+	}
+
+	public String getLabelPrefix() {
+		return labelPrefix;
 	}
 
 	public Long getId() {

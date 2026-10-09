@@ -245,3 +245,47 @@ input[type=password]:focus, select.input:focus { outline: 2px solid var(--accent
 .row .pill { flex: none; }
 .editor { margin-top: 12px; }
 .editor h2 { margin-bottom: 4px; }
+
+/* ---------- Waitlist priority ---------- */
+.pill.urgent { background: var(--bad-bg); color: var(--bad); }
+.pill.soon { background: var(--warn-bg); color: var(--warn); }
+.pill.routine { background: var(--soft); color: var(--muted); }
+.row .tags { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+.row .tags .pill { font-size: 0.78rem; padding: 3px 10px; }
+.choices { display: grid; gap: 10px; }
+.choice { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px;
+          background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.choice.on { border: 2px solid var(--accent); background: var(--accent-soft); }
+.choice strong { display: block; }
+.choice span { color: var(--muted); font-size: 0.9rem; }
+.hint { color: var(--muted); font-size: 0.85rem; }
+
+/* ---------- Manage ---------- */
+.row .count { min-width: 28px; padding: 2px 8px; border-radius: 999px; background: var(--bad-bg); color: var(--bad); font-weight: 700; text-align: center; }
+.details { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; }
+.details dt { color: var(--muted); }
+.details dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-grid .wide { grid-column: 1 / -1; }
+textarea.input { width: 100%; min-height: 90px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card);
+                 color: var(--text); font: inherit; resize: vertical; }
+input[type=date] { width: 100%; padding: 15px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text); font: inherit; }
+.decision { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.decision .btn + .btn { margin-top: 0; }
+.btn.danger { background: var(--card); color: var(--bad); border-color: var(--bad); }
+
+/* ---------- QR label (50 x 25 mm) ---------- */
+.label-preview { display: flex; justify-content: center; padding: 24px; background: var(--soft); border-radius: 16px; margin: 20px 0; }
+.qr-label { width: 50mm; height: 25mm; box-sizing: border-box; padding: 1.5mm; display: flex; gap: 2mm; align-items: center;
+            background: #fff; color: #000; border: 1px dashed #94a3b8; font-family: Inter, Arial, sans-serif; }
+.qr-label svg { width: 22mm; height: 22mm; flex: none; }
+.qr-label .id { font-size: 4.6mm; font-weight: 700; letter-spacing: 0.02em; line-height: 1.1; }
+.qr-label .what { font-size: 2.6mm; line-height: 1.2; margin-top: 0.8mm; }
+.qr-label .owner { font-size: 2.1mm; color: #333; margin-top: 1mm; }
+@media print {
+  @page { size: 50mm 25mm; margin: 0; }
+  body { background: #fff; }
+  body * { visibility: hidden; }
+  .qr-label, .qr-label * { visibility: visible; }
+  .qr-label { position: fixed; left: 0; top: 0; border: 0; }
+}

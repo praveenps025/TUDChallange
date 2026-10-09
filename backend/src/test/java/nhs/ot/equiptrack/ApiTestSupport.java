@@ -86,7 +86,8 @@ public abstract class ApiTestSupport {
 		long categoryId = jdbc.queryForObject(
 				"insert into equipment_category (name, icon_key, sort_order) values (?, 'layers', 100) returning id", Long.class, category);
 		long typeId = jdbc.queryForObject(
-				"insert into equipment_type (name, category_id, default_loan_days) values (?, ?, 14) returning id", Long.class, type, categoryId);
+				"insert into equipment_type (name, category_id, default_loan_days, label_prefix) values (?, ?, 14, ?) returning id", Long.class, type, categoryId,
+				"T" + suffix.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "0"));
 		return new TypeRef(typeId, type, category);
 	}
 

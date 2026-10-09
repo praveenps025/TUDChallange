@@ -46,14 +46,11 @@ export default function Account() {
       <p className="sub small">On a shared device, sign out so the next person can sign in.</p>
 
       {user.role === "MANAGER" && (
-        <>
-          <div className="section"><h2 className="strong">Manage</h2></div>
-          <Link className="row" to="/users">
-            <span className="tile"><Icon name="users" /></span>
-            <span className="body"><strong>Users</strong><span className="meta">Add staff, change roles, reset passwords</span></span>
-            <Icon name="chevron" className="chev" />
-          </Link>
-        </>
+        <Link className="row" style={{ marginTop: 20 }} to="/manage">
+          <span className="tile"><Icon name="grid" /></span>
+          <span className="body"><strong>Manage</strong><span className="meta">Equipment, approvals, insights and users</span></span>
+          <Icon name="chevron" className="chev" />
+        </Link>
       )}
 
       <div className="section"><h2 className="strong">Change password</h2></div>

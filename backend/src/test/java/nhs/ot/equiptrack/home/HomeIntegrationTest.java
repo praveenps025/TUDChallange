@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.jayway.jsonpath.JsonPath;
@@ -19,6 +20,15 @@ import nhs.ot.equiptrack.user.AppUser;
 import nhs.ot.equiptrack.user.Role;
 
 class HomeIntegrationTest extends ApiTestSupport {
+
+	// Home shows at most five tasks of each kind, so start from a quiet
+	// database: no loans out, nobody due to leave, no approvals waiting
+	@BeforeEach
+	void quietDatabase() {
+		jdbc.update("update loan set returned_at = now(), returned_clean = true where returned_at is null");
+		jdbc.update("update patient set discharge_planned_on = null");
+		jdbc.update("update discharge_override set status = 'rejected' where status = 'requested'");
+	}
 
 	@Test
 	void greetsTheSignedInUser() throws Exception {

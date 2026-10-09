@@ -3,6 +3,7 @@ package nhs.ot.equiptrack.waitlist;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -31,11 +32,13 @@ import nhs.ot.equiptrack.equipment.TypeRepository;
 @Service
 public class WaitlistService {
 
-	public record Entry(long id, String ward, String type, long days, boolean availableNow) {
+	// mrn is the patient's last four digits, or null for requests without a patient
+	public record Entry(long id, String ward, String type, long days, boolean availableNow, String priority, String mrn,
+			String note) {
 	}
 
-	// mrn (optional): the last four digits of a known patient, or the full MRN
-	public record NewRequest(String ward, String type, String mrn, String bed) {
+	// mrn: the last four digits of a known patient, or the full MRN for a new one
+	public record NewRequest(String ward, String type, String mrn, String bed, String priority, String note) {
 	}
 
 	private final WaitlistRepository requests;
@@ -64,21 +67,27 @@ public class WaitlistService {
 		this.dates = dates;
 	}
 
-	// Open requests, oldest first. Walking that order, each request takes one
-	// available item of its type; it is "available now" if one was left.
+	// Open requests in queue order (most urgent, then longest waiting). Walking
+	// that order, each request takes one available item of its type; it is
+	// "available now" if one was left.
 	@Transactional(readOnly = true)
 	public List<Entry> list() {
 		Map<Long, Long> left = new HashMap<>(equipment.countByTypeWithStatus(EquipmentStatus.AVAILABLE).stream()
 				.collect(Collectors.toMap(EquipmentRepository.TypeCount::getTypeId, EquipmentRepository.TypeCount::getTotal)));
-		return requests.findOpenOldestFirst().stream().map(request -> {
+		return queue().stream().map(request -> {
 			long typeId = request.getType().getId();
 			boolean availableNow = left.getOrDefault(typeId, 0L) > 0;
 			if (availableNow) {
 				left.merge(typeId, -1L, Long::sum);
 			}
 			return new Entry(request.getId(), request.getWard().getName(), request.getType().getName(),
-					dates.daysSince(request.getRequestedAt()), availableNow);
+					dates.daysSince(request.getRequestedAt()), availableNow, request.getPriority().name().toLowerCase(),
+					request.getPatient() == null ? null : request.getPatient().getMrnSuffix(), request.getNote());
 		}).toList();
+	}
+
+	public List<WaitlistRequest> queue() {
+		return requests.findOpenOldestFirst().stream().sorted(WaitlistRequest.QUEUE_ORDER).toList();
 	}
 
 	@Transactional
@@ -88,10 +97,13 @@ public class WaitlistService {
 				.orElseThrow(() -> ApiException.badRequest("Unknown ward " + input.ward()));
 		EquipmentType type = types.findByName(input.type().trim())
 				.orElseThrow(() -> ApiException.badRequest("Unknown equipment type " + input.type()));
-		Patient patient = input.mrn() == null || input.mrn().isBlank() ? null : patients.findOrCreate(input.mrn(), ward, input.bed());
+		WaitlistRequest.Priority priority = parsePriority(input.priority());
+		Patient patient = patients.findOrCreate(input.mrn(), ward, input.bed());
+		String note = input.note() == null || input.note().isBlank() ? null : input.note().trim();
 
-		WaitlistRequest request = requests.save(new WaitlistRequest(ward, type, patient, user.id(), dates.now()));
-		activity.log(ActivityLog.Kind.CLIPBOARD, type.getName() + " requested", ward.getName(), user, null);
+		WaitlistRequest request = requests.save(new WaitlistRequest(ward, type, patient, priority, note, user.id(), dates.now()));
+		activity.log(ActivityLog.Kind.CLIPBOARD, type.getName() + " requested",
+				ward.getName() + " · " + priority.name().charAt(0) + priority.name().substring(1).toLowerCase(), user, null);
 		return list().stream().filter(e -> e.id() == request.getId()).findFirst().orElseThrow();
 	}
 
@@ -128,6 +140,14 @@ public class WaitlistService {
 		}
 		lifecycle.issue(user, item, request.getWard(), request.getPatient(), request.getId(), dueOn);
 		request.allocate(item.getId(), user.id(), dates.now());
+	}
+
+	private static WaitlistRequest.Priority parsePriority(String value) {
+		try {
+			return WaitlistRequest.Priority.valueOf(value.trim().toUpperCase(Locale.ROOT));
+		} catch (IllegalArgumentException | NullPointerException e) {
+			throw ApiException.badRequest("Priority must be urgent, soon or routine");
+		}
 	}
 
 	private WaitlistRequest findOpen(long requestId) {

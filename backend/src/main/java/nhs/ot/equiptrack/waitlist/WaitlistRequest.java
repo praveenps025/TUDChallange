@@ -1,6 +1,7 @@
 package nhs.ot.equiptrack.waitlist;
 
 import java.time.Instant;
+import java.util.Comparator;
 
 import jakarta.persistence.Converter;
 import jakarta.persistence.Entity;
@@ -31,6 +32,24 @@ public class WaitlistRequest {
 		}
 	}
 
+	// Chosen by whoever makes the request, from the patient's condition
+	public enum Priority {
+		URGENT, SOON, ROUTINE;
+
+		@Converter(autoApply = true)
+		public static class DbConverter extends LowercaseEnumConverter<Priority> {
+			public DbConverter() {
+				super(Priority.class);
+			}
+		}
+	}
+
+	// The order requests are served in: most urgent first, then longest waiting
+	public static final Comparator<WaitlistRequest> QUEUE_ORDER = Comparator
+			.comparing(WaitlistRequest::getPriority)
+			.thenComparing(WaitlistRequest::getRequestedAt)
+			.thenComparing(WaitlistRequest::getId);
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -45,6 +64,10 @@ public class WaitlistRequest {
 	private Patient patient;
 
 	private Status status = Status.OPEN;
+
+	private Priority priority = Priority.ROUTINE;
+
+	private String note;
 
 	private Long requestedBy;
 
@@ -62,10 +85,13 @@ public class WaitlistRequest {
 	protected WaitlistRequest() {
 	}
 
-	WaitlistRequest(Location ward, EquipmentType type, Patient patient, long requestedBy, Instant requestedAt) {
+	WaitlistRequest(Location ward, EquipmentType type, Patient patient, Priority priority, String note, long requestedBy,
+			Instant requestedAt) {
 		this.ward = ward;
 		this.type = type;
 		this.patient = patient;
+		this.priority = priority;
+		this.note = note;
 		this.requestedBy = requestedBy;
 		this.requestedAt = requestedAt;
 	}
@@ -105,6 +131,14 @@ public class WaitlistRequest {
 
 	public Instant getRequestedAt() {
 		return requestedAt;
+	}
+
+	public Priority getPriority() {
+		return priority;
+	}
+
+	public String getNote() {
+		return note;
 	}
 
 }

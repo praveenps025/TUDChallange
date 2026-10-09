@@ -38,13 +38,21 @@ export function StatusPill({ status }) {
   return <span className={`pill ${status}`}><Icon name={icon} />{text}</span>;
 }
 
+// Staff get the audit walk; managers get Manage (registration, inventory,
+// approvals, insights, users) in its place
+const TABS = {
+  OT_STAFF: [["/", "home", "Home"], ["/waitlist", "list", "Waitlist"], ["/discharge", "clipboard", "Discharge"], ["/audit", "route", "Audit"]],
+  MANAGER: [["/", "home", "Home"], ["/waitlist", "list", "Waitlist"], ["/discharge", "clipboard", "Discharge"], ["/manage", "grid", "Manage"]],
+};
+
 export function BottomNav({ scanButton = false }) {
-  const tabs = [["/", "home", "Home"], ["/waitlist", "list", "Waitlist"], ["/discharge", "clipboard", "Discharge"], ["/insights", "chart", "Insights"]];
+  const { user } = useAuth();
+  const tabs = TABS[user?.role] ?? TABS.OT_STAFF;
   return (
     <nav className="tabs">
       <div className="inner">
         {tabs.map(([to, icon, text]) => (
-          <NavLink key={to} to={to} end className={({ isActive }) => (isActive ? "on" : "")}>
+          <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => (isActive ? "on" : "")}>
             <Icon name={icon} />{text}
           </NavLink>
         ))}

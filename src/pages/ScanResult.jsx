@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import Icon from "../components/Icon";
 import { AppBar, ItemCard, Loading } from "../components/ui";
 import { post } from "../api";
+import { useAuth } from "../auth";
 import useApi from "../useApi";
 
 // One primary action for each status
@@ -15,6 +16,7 @@ const ACTIONS = {
 
 export default function ScanResult() {
   const { id } = useParams();
+  const { user } = useAuth();
   const { data: item, error, reload } = useApi(`/equipment/${encodeURIComponent(id)}`);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -65,6 +67,12 @@ export default function ScanResult() {
               <Link className="btn" to={action.to(item.id)}><Icon name={action.icon} />{action.text}</Link>
             ) : (
               <button className="btn" onClick={markInspected} disabled={saving}><Icon name={action.icon} />{action.text}</button>
+            )}
+            {(item.status === "issued" || item.status === "missing") && (
+              <Link className="btn secondary" to={`/waitlist/new?type=${encodeURIComponent(item.type)}`}><Icon name="plus" />Request one for a patient</Link>
+            )}
+            {user.role === "MANAGER" && (
+              <Link className="btn secondary" to={`/manage/equipment/${item.id}`}><Icon name="print" />Details and label</Link>
             )}
           </>
         )}

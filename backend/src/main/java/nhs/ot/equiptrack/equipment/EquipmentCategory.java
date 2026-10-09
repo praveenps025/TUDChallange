@@ -21,6 +21,12 @@ public class EquipmentCategory {
 	protected EquipmentCategory() {
 	}
 
+	EquipmentCategory(String name, String iconKey) {
+		this.name = name;
+		this.iconKey = iconKey;
+		this.sortOrder = 100;
+	}
+
 	public Long getId() {
 		return id;
 	}

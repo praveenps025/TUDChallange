@@ -13,12 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 import nhs.ot.equiptrack.activity.ActivityService;
 import nhs.ot.equiptrack.auth.CurrentUser;
 import nhs.ot.equiptrack.common.Dates;
+import nhs.ot.equiptrack.discharge.DischargeService;
 import nhs.ot.equiptrack.discharge.PatientRepository;
 import nhs.ot.equiptrack.equipment.EquipmentRepository;
 import nhs.ot.equiptrack.equipment.EquipmentStatus;
 import nhs.ot.equiptrack.equipment.EquipmentViews;
 import nhs.ot.equiptrack.equipment.LoanRepository;
-import nhs.ot.equiptrack.waitlist.WaitlistRepository;
+import nhs.ot.equiptrack.waitlist.WaitlistService;
 import nhs.ot.equiptrack.waitlist.WaitlistRequest;
 
 @Service
@@ -36,7 +37,8 @@ public class HomeService {
 	private static final int MAX_PER_KIND = 5;
 	private static final int ACTIVITY_COUNT = 5;
 
-	private final WaitlistRepository requests;
+	private final WaitlistService waitlist;
+	private final DischargeService discharge;
 	private final EquipmentRepository equipment;
 	private final LoanRepository loans;
 	private final PatientRepository patients;
@@ -45,9 +47,10 @@ public class HomeService {
 	private final Dates dates;
 	private final int unseenDays;
 
-	HomeService(WaitlistRepository requests, EquipmentRepository equipment, LoanRepository loans, PatientRepository patients,
+	HomeService(WaitlistService waitlist, DischargeService discharge, EquipmentRepository equipment, LoanRepository loans, PatientRepository patients,
 			ActivityService activity, EquipmentViews views, Dates dates, @Value("${app.home.unseen-days}") int unseenDays) {
-		this.requests = requests;
+		this.waitlist = waitlist;
+		this.discharge = discharge;
 		this.equipment = equipment;
 		this.loans = loans;
 		this.patients = patients;
@@ -64,6 +67,9 @@ public class HomeService {
 		addLoansDue(tasks);
 		addUnseen(tasks);
 		addDischarges(tasks);
+		if (user.isManager()) {
+			addApprovals(tasks);
+		}
 
 		List<Activity> recent = activity.latest(ACTIVITY_COUNT).stream()
 				.map(a -> new Activity(a.getKind().name().toLowerCase(), a.getTitle(), a.getDetail(), dates.time(a.getOccurredAt())))
@@ -74,7 +80,7 @@ public class HomeService {
 	// An available item and someone waiting for that type: one task per type, for the oldest request
 	private void addAllocations(List<Task> tasks) {
 		Set<Long> types = new HashSet<>();
-		for (WaitlistRequest request : requests.findOpenOldestFirst()) {
+		for (WaitlistRequest request : waitlist.queue()) {
 			if (!types.add(request.getType().getId())) {
 				continue;
 			}
@@ -99,6 +105,13 @@ public class HomeService {
 			tasks.add(new Task("eyeoff", "Unseen items",
 					unseen + (unseen == 1 ? " item" : " items") + " · Last seen over " + unseenDays + " days ago", "/audit"));
 		}
+	}
+
+	// Managers: discharge overrides waiting for a decision
+	private void addApprovals(List<Task> tasks) {
+		discharge.pending().stream().limit(MAX_PER_KIND).forEach(o ->
+				tasks.add(new Task("shield", "Approve discharge", o.ward() + " · MRN ••••" + o.mrn() + " · asked by " + o.requestedBy(),
+						"/discharge?mrn=" + o.mrn())));
 	}
 
 	private void addDischarges(List<Task> tasks) {

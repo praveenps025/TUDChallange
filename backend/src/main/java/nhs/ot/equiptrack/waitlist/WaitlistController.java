@@ -31,11 +31,14 @@ class WaitlistController {
 	record ReturnAndAllocateRequest(@NotNull(message = "Choose the request to allocate to") Long requestId, LocalDate dueOn) {
 	}
 
+	// priority: urgent, soon or routine
 	record CreateRequest(
+			@NotBlank(message = "Choose the item needed") String type,
 			@NotBlank(message = "Choose a ward") String ward,
-			@NotBlank(message = "Choose an equipment type") String type,
-			@Size(max = 30, message = "MRN is too long") String mrn,
-			@Size(max = 10, message = "Bed is too long") String bed) {
+			@NotBlank(message = "Enter the patient's MRN") @Size(max = 30, message = "MRN is too long") String mrn,
+			@NotBlank(message = "Choose a priority") String priority,
+			@Size(max = 10, message = "Bed is too long") String bed,
+			@Size(max = 200, message = "Keep the note under 200 characters") String note) {
 	}
 
 	private final WaitlistService service;
@@ -52,7 +55,8 @@ class WaitlistController {
 	@PostMapping("/waitlist")
 	@ResponseStatus(HttpStatus.CREATED)
 	WaitlistService.Entry create(@AuthenticationPrincipal CurrentUser user, @Valid @RequestBody CreateRequest request) {
-		return service.create(user, new WaitlistService.NewRequest(request.ward(), request.type(), request.mrn(), request.bed()));
+		return service.create(user, new WaitlistService.NewRequest(request.ward(), request.type(), request.mrn(), request.bed(),
+				request.priority(), request.note()));
 	}
 
 	@DeleteMapping("/waitlist/{id}")

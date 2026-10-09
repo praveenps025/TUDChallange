@@ -67,7 +67,7 @@ class InsightsIntegrationTest extends ApiTestSupport {
 		TypeRef type = newType();
 		String onTime = issuedEquipment(type, "Ward 2B", null, today().plusDays(2));
 		String late = issuedEquipment(type, "Ward 2B", null, today().minusDays(1));
-		String token = tokenFor(Role.OT_STAFF);
+		String token = tokenFor(Role.MANAGER);
 		for (String label : new String[] { onTime, late }) {
 			mvc.perform(jsonBody(withToken(post("/equipment/" + label + "/return"), token), "clean", true)).andExpect(status().isOk());
 		}
@@ -82,7 +82,7 @@ class InsightsIntegrationTest extends ApiTestSupport {
 	}
 
 	private Map<String, Object> overview() throws Exception {
-		String body = mvc.perform(withToken(get("/insights"), tokenFor(Role.OT_STAFF)))
+		String body = mvc.perform(withToken(get("/insights"), tokenFor(Role.MANAGER)))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		return JsonPath.read(body, "$");
 	}

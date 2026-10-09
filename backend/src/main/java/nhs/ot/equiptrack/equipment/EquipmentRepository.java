@@ -25,6 +25,13 @@ public interface EquipmentRepository extends JpaRepository<Equipment, Long>, Jpa
 
 	long countByStatus(EquipmentStatus status);
 
+	// Highest number used so far with a prefix: WC-031 -> 31
+	@Query(value = """
+			select coalesce(max(cast(substring(label_code from length(:prefix) + 2) as integer)), 0)
+			from equipment where label_code ~ ('^' || :prefix || '-[0-9]+$')
+			""", nativeQuery = true)
+	int findHighestNumber(String prefix);
+
 	// Available items per type, for waitlist "available now"
 	@Query("select e.type.id as typeId, count(e) as total from Equipment e where e.status = :status group by e.type.id")
 	List<TypeCount> countByTypeWithStatus(EquipmentStatus status);

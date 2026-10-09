@@ -8,9 +8,14 @@
 //   POST /equipment/:id/return              { clean: true|false }
 //   POST /equipment/:id/inspect
 //   POST /equipment/:id/return-and-allocate { requestId }
-//   GET  /equipment-types, /categories, /locations?kind=ward
+//   POST /equipment                         register (managers) { type, pool, location, details }
+//   GET  /equipment/:id/details             everything about one item
+//   PUT  /equipment/:id                     edit details (managers) { pool, details }
+//   POST /equipment/:id/label-printed       (managers)
+//   GET  /equipment-types, /categories, /locations?kind=ward, /pools
+//   POST /equipment-types                   (managers) { name, category, labelPrefix, defaultLoanDays }
 //   GET  /waitlist                          requests, oldest first
-//   POST /waitlist                          { ward, type, mrn?, bed? }
+//   POST /waitlist                          { type, ward, mrn, priority, bed?, note? }
 //   DELETE /waitlist/:id
 //   POST /waitlist/:id/allocate             { equipmentId }
 //   GET  /audit                             current audit walk (404 when none)
@@ -18,8 +23,10 @@
 //   POST /audit/scan                        { equipmentId }
 //   POST /audit/finish                      unfound items become missing
 //   GET  /discharge/:mrn                    patient and their loaned items
-//   POST /discharge/:mrn/override           { reason }
-//   GET  /insights                          monthly overview
+//   POST /discharge/:mrn/override           { reason } (staff: request; manager: approve)
+//   GET  /discharge/overrides               pending approvals (managers)
+//   POST /discharge/overrides/:id/approve   { reason } (managers), and /reject
+//   GET  /insights                          monthly overview (managers)
 //
 //   POST /auth/login                        { username, password } -> { token, expiresAt, user }
 //   GET  /auth/me                           signed-in user
@@ -31,10 +38,21 @@
 import { ApiError } from "./api";
 
 const TYPES = [
-  { name: "Wheelchair", category: "Wheelchairs", icon: "wheelchair", defaultLoanDays: 14 },
-  { name: "Pressure cushion", category: "Cushions", icon: "layers", defaultLoanDays: 14 },
-  { name: "Sliding board", category: "Sliding boards", icon: "layers", defaultLoanDays: 14 },
+  { name: "Wheelchair", category: "Wheelchairs", icon: "wheelchair", labelPrefix: "WC", defaultLoanDays: 14 },
+  { name: "Pressure cushion", category: "Cushions", icon: "layers", labelPrefix: "CU", defaultLoanDays: 14 },
+  { name: "Sliding board", category: "Sliding boards", icon: "layers", labelPrefix: "SB", defaultLoanDays: 14 },
 ];
+
+const POOLS = [
+  { code: "MAIN", name: "Main OT stock", description: "General OT equipment store" },
+  { code: "BURKITT", name: "Burkitt / ARHC", description: "Held for Burkitt and ARHC" },
+  { code: "WSU_ASU", name: "WSU / ASU own funding", description: "Bought from WSU / ASU budgets" },
+  { code: "WINTER", name: "Winter Initiative", description: "Bought through the Winter Initiative" },
+];
+
+const DETAIL_FIELDS = ["model", "serialNumber", "assetNumber", "assetFlag", "size", "maxUserWeight", "hc21Number", "dmlNumber",
+  "therapist", "comments", "purchaseDate", "lastServiceDate"];
+const details = {}; // extra registration details by item ID
 
 const LOCATIONS = [
   { name: "OT store", kind: "store" }, { name: "Workshop", kind: "workshop" },
@@ -54,14 +72,16 @@ const equipment = {
 };
 
 let waitlist = [
-  { id: 1, ward: "Ward 3A", type: "Pressure cushion", days: 6 },
-  { id: 2, ward: "Ward 5B", type: "Wheelchair", days: 5 },
-  { id: 3, ward: "Ward 2C", type: "Sliding board", days: 4 },
-  { id: 4, ward: "Ward 4A", type: "Pressure cushion", days: 3 },
-  { id: 5, ward: "Ward 1B", type: "Wheelchair", days: 2 },
-  { id: 6, ward: "Ward 6A", type: "Pressure cushion", days: 1 },
-  { id: 7, ward: "Ward 2A", type: "Wheelchair", days: 1 },
+  { id: 1, ward: "Ward 3A", type: "Pressure cushion", days: 6, priority: "routine", mrn: null, note: null },
+  { id: 2, ward: "Ward 5B", type: "Wheelchair", days: 5, priority: "soon", mrn: null, note: null },
+  { id: 3, ward: "Ward 2C", type: "Sliding board", days: 4, priority: "urgent", mrn: null, note: null },
+  { id: 4, ward: "Ward 4A", type: "Pressure cushion", days: 3, priority: "soon", mrn: null, note: null },
+  { id: 5, ward: "Ward 1B", type: "Wheelchair", days: 2, priority: "routine", mrn: null, note: null },
+  { id: 6, ward: "Ward 6A", type: "Pressure cushion", days: 1, priority: "routine", mrn: null, note: null },
+  { id: 7, ward: "Ward 2A", type: "Wheelchair", days: 1, priority: "routine", mrn: null, note: null },
 ];
+const PRIORITY_ORDER = { urgent: 0, soon: 1, routine: 2 };
+const queue = () => [...waitlist].sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || b.days - a.days || a.id - b.id);
 let nextRequestId = 8;
 
 const activity = [
@@ -73,6 +93,7 @@ const activity = [
 const patients = {
   "4821": { mrn: "4821", ward: "Ward 4C", bed: "06", items: ["WC-018"], override: null },
 };
+let nextOverrideId = 1;
 
 // The audit walk in progress, or null
 let walk = {
@@ -114,10 +135,10 @@ function openRequest(id) {
   return request;
 }
 
-// Oldest requests first get the available items of their type
+// In queue order (most urgent, then longest waiting), requests take the available items of their type
 function withAvailability() {
   const left = {};
-  return waitlist.map(request => {
+  return queue().map(request => {
     left[request.type] ??= Object.values(equipment).filter(e => e.type === request.type && e.status === "available").length;
     const availableNow = left[request.type] > 0;
     if (availableNow) left[request.type]--;
@@ -133,6 +154,7 @@ function returnItem(me, e, clean) {
 
 function allocate(me, request, e) {
   if (e.status !== "available" || e.type !== request.type) throw new ApiError(409, `${e.id} can't be allocated to this request`);
+  if (request.mrn && patients[request.mrn]) patients[request.mrn].items.push(e.id);
   Object.assign(e, { status: "issued", location: request.ward, note: "Loaned today · Due in 14 days" });
   waitlist = waitlist.filter(r => r !== request);
   log(me, "out", `${e.name} issued`, `${e.id} · ${request.ward}`, e.id);
@@ -152,6 +174,26 @@ function patientFor(mrn) {
   const patient = patients[mrn.replace(/\D/g, "").slice(-4)];
   if (!patient) throw new ApiError(404, "No patient found with that MRN");
   return patient;
+}
+
+const patientResponse = patient => ({ ...patient, items: patient.items.map(item) });
+
+function detailsOf(e) {
+  const extra = details[e.id] ?? {};
+  const pool = POOLS.find(p => p.code === (extra.pool ?? "MAIN"));
+  return { ...e, pool: pool.code, poolName: pool.name, labelPrintedAt: extra.labelPrintedAt ?? null,
+    ...Object.fromEntries(DETAIL_FIELDS.map(f => [f, extra[f] ?? null])) };
+}
+
+function checkDetails(d) {
+  if (!d?.name?.trim()) throw new ApiError(400, "Enter a name for the item");
+  if (d.assetFlag && !["AT+", "AT-"].includes(d.assetFlag)) throw new ApiError(400, "Asset flag must be AT+ or AT-");
+}
+
+function poolCode(code) {
+  const pool = POOLS.find(p => p.code.toLowerCase() === code?.toLowerCase());
+  if (!pool) throw new ApiError(400, `Unknown funding pool ${code}`);
+  return pool.code;
 }
 
 const routes = {
@@ -219,9 +261,28 @@ const routes = {
       { icon: "clock", title: "Loan due", detail: "WC-026 · Ward 5A · Due today", to: "/item/WC-026" },
       { icon: "eyeoff", title: "Unseen items", detail: "3 items · Last seen over 7 days ago", to: "/audit" },
       { icon: "clipboard", title: "Discharge check", detail: "Ward 4C · MRN ••••4821", to: "/discharge?mrn=4821" },
+      ...(me.role === "MANAGER" ? Object.values(patients).filter(p => p.override?.status === "requested").map(p => (
+        { icon: "shield", title: "Approve discharge", detail: `${p.ward} · MRN ••••${p.mrn} · asked by ${p.override.requestedBy}`, to: `/discharge?mrn=${p.mrn}` }
+      )) : []),
     ],
     activity: activity.slice(0, 5).map(({ icon, title, detail, time }) => ({ icon, title, detail, time })),
   }),
+
+  "POST /equipment": (_, { type, pool, location, details: d }, me) => {
+    managerOnly(me);
+    const t = TYPES.find(x => x.name === type);
+    if (!t) throw new ApiError(400, `Unknown equipment type ${type}`);
+    const code = poolCode(pool);
+    const where = location || "OT store";
+    if (!LOCATIONS.some(l => l.name === where)) throw new ApiError(400, `Unknown location ${where}`);
+    checkDetails(d);
+    const highest = Math.max(0, ...Object.keys(equipment).filter(id => id.startsWith(`${t.labelPrefix}-`)).map(id => Number(id.split("-")[1]) || 0));
+    const id = `${t.labelPrefix}-${String(highest + 1).padStart(3, "0")}`;
+    equipment[id] = { id, name: d.name.trim(), type: t.name, category: t.category, status: "available", location: where, note: "Checked today" };
+    details[id] = { ...d, pool: code };
+    log(me, "in", `${d.name.trim()} registered`, `${id} · ${where}`, id);
+    return detailsOf(equipment[id]);
+  },
 
   "GET /equipment": (_, __, ___, query) => {
     const page = Number(query.page ?? 0), size = Number(query.size ?? 20);
@@ -242,6 +303,27 @@ const routes = {
   },
 
   "GET /equipment/:id": ({ id }) => item(id),
+
+  "GET /equipment/:id/details": ({ id }) => detailsOf(item(id)),
+
+  "PUT /equipment/:id": ({ id }, { pool, details: d }, me) => {
+    managerOnly(me);
+    const e = item(id);
+    checkDetails(d);
+    details[e.id] = { ...details[e.id], ...d, pool: poolCode(pool) };
+    e.name = d.name.trim();
+    log(me, "clipboard", `${e.name} details updated`, e.id, e.id);
+    return detailsOf(e);
+  },
+
+  "POST /equipment/:id/label-printed": ({ id }, _, me) => {
+    managerOnly(me);
+    const e = item(id);
+    const reprint = Boolean(details[e.id]?.labelPrintedAt);
+    details[e.id] = { ...details[e.id], labelPrintedAt: new Date().toISOString() };
+    log(me, "clipboard", reprint ? "Label reprinted" : "Label printed", e.id, e.id);
+    return detailsOf(e);
+  },
 
   "POST /equipment/:id/return": ({ id }, { clean }, me) => {
     if (typeof clean !== "boolean") throw new ApiError(400, "Say whether the item is clean and undamaged");
@@ -268,7 +350,23 @@ const routes = {
     return allocate(me, request, e);
   },
 
-  "GET /equipment-types": () => TYPES.map(({ name, category, defaultLoanDays }) => ({ name, category, defaultLoanDays })),
+  "GET /equipment-types": () => TYPES.map(({ name, category, labelPrefix, defaultLoanDays }) => ({ name, category, labelPrefix, defaultLoanDays })),
+
+  "POST /equipment-types": (_, { name, category, labelPrefix, defaultLoanDays }, me) => {
+    managerOnly(me);
+    if (!name?.trim()) throw new ApiError(400, "Enter a name for the type");
+    if (!category?.trim()) throw new ApiError(400, "Choose or enter a category");
+    const prefix = labelPrefix?.trim().toUpperCase() ?? "";
+    if (!/^[A-Z0-9]{1,10}$/.test(prefix)) throw new ApiError(400, "Label prefixes are 1 to 10 letters or numbers, e.g. WC");
+    if (TYPES.some(t => t.name === name.trim())) throw new ApiError(409, `There is already a type called ${name.trim()}`);
+    if (TYPES.some(t => t.labelPrefix === prefix)) throw new ApiError(409, `The prefix ${prefix} is already used by another type`);
+    const type = { name: name.trim(), category: category.trim(), icon: "layers", labelPrefix: prefix, defaultLoanDays: Number(defaultLoanDays) || 14 };
+    TYPES.push(type);
+    log(me, "clipboard", "Equipment type added", `${type.name} · ${prefix}`);
+    return { name: type.name, category: type.category, labelPrefix: prefix, defaultLoanDays: type.defaultLoanDays };
+  },
+
+  "GET /pools": () => POOLS,
 
   "GET /categories": () => [...new Set(TYPES.map(t => t.category))].map(name => ({
     name, icon: TYPES.find(t => t.category === name).icon, types: TYPES.filter(t => t.category === name).map(t => t.name),
@@ -278,15 +376,22 @@ const routes = {
 
   "GET /waitlist": () => withAvailability(),
 
-  "POST /waitlist": (_, { ward, type, mrn }, me) => {
+  "POST /waitlist": (_, { ward, type, mrn, priority, note }, me) => {
+    if (!type) throw new ApiError(400, "Choose the item needed");
     if (!ward) throw new ApiError(400, "Choose a ward");
-    if (!type) throw new ApiError(400, "Choose an equipment type");
+    if (!mrn?.trim()) throw new ApiError(400, "Enter the patient's MRN");
+    if (!priority) throw new ApiError(400, "Choose a priority");
+    if (!(priority in PRIORITY_ORDER)) throw new ApiError(400, "Priority must be urgent, soon or routine");
     if (!LOCATIONS.some(l => l.kind === "ward" && l.name === ward)) throw new ApiError(400, `Unknown ward ${ward}`);
     if (!TYPES.some(t => t.name === type)) throw new ApiError(400, `Unknown equipment type ${type}`);
-    if (mrn && mrn.replace(/\D/g, "").length < 4) throw new ApiError(400, "Enter at least the last 4 digits of the MRN");
-    const request = { id: nextRequestId++, ward, type, days: 0 };
+    const digits = mrn.replace(/\D/g, "");
+    if (digits.length < 4) throw new ApiError(400, "Enter at least the last 4 digits of the MRN");
+    const suffix = digits.slice(-4);
+    if (digits.length === 4 && !patients[suffix]) throw new ApiError(400, "Enter the full MRN to add a new patient");
+    patients[suffix] ??= { mrn: suffix, ward, bed: null, items: [], override: null };
+    const request = { id: nextRequestId++, ward, type, days: 0, priority, mrn: suffix, note: note?.trim() || null };
     waitlist.push(request);
-    log(me, "clipboard", `${type} requested`, ward);
+    log(me, "clipboard", `${type} requested`, `${ward} · ${priority[0].toUpperCase()}${priority.slice(1)}`);
     return withAvailability().find(r => r.id === request.id);
   },
 
@@ -340,21 +445,37 @@ const routes = {
     return { area: result.area, total: result.total, found: result.found, markedMissing: result.missing.length };
   },
 
-  "GET /discharge/:mrn": ({ mrn }) => {
-    const patient = patientFor(mrn);
-    return { ...patient, items: patient.items.map(item) };
+  // Must come before /discharge/:mrn
+  "GET /discharge/overrides": (_, __, me) => {
+    managerOnly(me);
+    return Object.values(patients).filter(p => p.override?.status === "requested").map(p => ({
+      id: p.override.id, mrn: p.mrn, ward: p.ward, bed: p.bed, reason: p.override.reason, requestedBy: p.override.requestedBy,
+      requestedAt: p.override.requestedAt, itemsOut: p.items.map(item).filter(e => e.status !== "available").length,
+    }));
   },
 
+  "POST /discharge/overrides/:id/approve": ({ id }, { reason }, me) => decideOverride(me, Number(id), true, reason),
+
+  "POST /discharge/overrides/:id/reject": ({ id }, { reason }, me) => decideOverride(me, Number(id), false, reason),
+
+  "GET /discharge/:mrn": ({ mrn }) => patientResponse(patientFor(mrn)),
+
+  // Staff ask for an override; a manager doing the check approves it straight away
   "POST /discharge/:mrn/override": ({ mrn }, { reason }, me) => {
     const patient = patientFor(mrn);
     if (!reason?.trim()) throw new ApiError(400, "A reason is required");
-    if (patient.override?.status === "requested") throw new ApiError(409, "An override for this patient is already waiting for a supervisor");
-    patient.override = { reason: reason.trim(), status: "requested" };
-    log(me, "clipboard", "Discharge override requested", `${patient.ward} · MRN ••••${patient.mrn}`);
-    return { ...patient, items: patient.items.map(item) };
+    if (patient.override?.status === "requested") throw new ApiError(409, "An override for this patient is already waiting for a manager");
+    const manager = me.role === "MANAGER";
+    patient.override = {
+      id: nextOverrideId++, reason: reason.trim(), status: manager ? "approved" : "requested", requestedBy: me.name, requestedAt: now(),
+      decidedBy: manager ? me.name : null, decisionReason: manager ? reason.trim() : null,
+    };
+    log(me, "clipboard", manager ? "Discharge approved" : "Discharge override requested", `${patient.ward} · MRN ••••${patient.mrn}`);
+    return patientResponse(patient);
   },
 
-  "GET /insights": () => {
+  "GET /insights": (_, __, me) => {
+    managerOnly(me);
     const items = Object.values(equipment);
     const count = (category, ...statuses) => items.filter(e => e.category === category && statuses.includes(e.status)).length;
     return {
@@ -375,6 +496,17 @@ const routes = {
     };
   },
 };
+
+function decideOverride(me, id, approve, reason) {
+  managerOnly(me);
+  if (!reason?.trim()) throw new ApiError(400, "A reason is required");
+  const patient = Object.values(patients).find(p => p.override?.id === id);
+  if (!patient) throw new ApiError(404, "Override request not found");
+  if (patient.override.status !== "requested") throw new ApiError(409, `This request has already been ${patient.override.status}`);
+  Object.assign(patient.override, { status: approve ? "approved" : "rejected", decidedBy: me.name, decisionReason: reason.trim() });
+  log(me, "clipboard", approve ? "Discharge approved" : "Discharge override rejected", `${patient.ward} · MRN ••••${patient.mrn}`);
+  return patientResponse(patient);
+}
 
 // Match "/equipment/CU-024/return" against "/equipment/:id/return"
 function match(pattern, path) {

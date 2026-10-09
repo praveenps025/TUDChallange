@@ -6,6 +6,7 @@ import { post } from "../api";
 import useApi from "../useApi";
 
 const SHOWN = 5;
+const PRIORITY_NAMES = { urgent: "Urgent", soon: "Soon", routine: "Routine" };
 
 export default function Waitlist() {
   const navigate = useNavigate();
@@ -49,7 +50,8 @@ export default function Waitlist() {
       {!requests ? <Loading error={error} /> : (
         <>
           <h1>{requests.length} requests waiting</h1>
-          <p className="sub">Oldest first · {ready} can be allocated now</p>
+          <p className="sub">Most urgent first · {ready} can be allocated now</p>
+          {!item && <Link className="btn secondary" style={{ marginTop: 16 }} to="/waitlist/new"><Icon name="plus" />New request</Link>}
 
           {item ? (
             <div className="callout" style={{ margin: "24px 0 20px" }}>
@@ -79,6 +81,11 @@ export default function Waitlist() {
                   <span className="body">
                     <strong>{r.ward}</strong>
                     <span className="meta">{r.type} · {r.days} day{r.days === 1 ? "" : "s"} waiting</span>
+                    <span className="tags">
+                      <span className={`pill ${r.priority}`}>{PRIORITY_NAMES[r.priority]}</span>
+                      {r.mrn && <span className="meta">MRN ••••{r.mrn}</span>}
+                    </span>
+                    {r.note && <span className="meta">{r.note}</span>}
                     {r.availableNow && !item && <span className="ready"><Icon name="check" />Available now</span>}
                   </span>
                   <Icon name="chevron" className="chev" />

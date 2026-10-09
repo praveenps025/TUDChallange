@@ -2,12 +2,14 @@ package nhs.ot.equiptrack.waitlist;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -21,22 +23,28 @@ import nhs.ot.equiptrack.user.Role;
 class WaitlistManagementIntegrationTest extends ApiTestSupport {
 
 	@Test
-	void createsRequest() throws Exception {
+	void createsRequestForAKnownPatient() throws Exception {
 		AppUser user = createUser(Role.OT_STAFF);
 		TypeRef type = newType();
 		newEquipment(type, "available", "OT store");
+		PatientRef patient = newPatient("Ward 3A", null);
 
-		String body = mvc.perform(jsonBody(withToken(post("/waitlist"), tokenFor(user)), "ward", "Ward 3A", "type", type.name()))
+		String body = mvc.perform(jsonBody(withToken(post("/waitlist"), tokenFor(user)),
+				"type", type.name(), "ward", "Ward 3A", "mrn", patient.suffix(), "priority", "Urgent", "note", "Pressure area risk"))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.ward").value("Ward 3A"))
 				.andExpect(jsonPath("$.type").value(type.name()))
 				.andExpect(jsonPath("$.days").value(0))
 				.andExpect(jsonPath("$.availableNow").value(true))
+				.andExpect(jsonPath("$.priority").value("urgent"))
+				.andExpect(jsonPath("$.mrn").value(patient.suffix()))
+				.andExpect(jsonPath("$.note").value("Pressure area risk"))
 				.andReturn().getResponse().getContentAsString();
 
 		long id = ((Number) JsonPath.read(body, "$.id")).longValue();
-		assertThat(jdbc.queryForMap("select requested_by, patient_id, status from waitlist_request where id = ?", id))
-				.containsEntry("requested_by", user.getId()).containsEntry("status", "open").containsEntry("patient_id", null);
+		assertThat(jdbc.queryForMap("select requested_by, patient_id, status, priority from waitlist_request where id = ?", id))
+				.containsEntry("requested_by", user.getId()).containsEntry("status", "open")
+				.containsEntry("patient_id", patient.id()).containsEntry("priority", "urgent");
 	}
 
 	@Test
@@ -47,7 +55,7 @@ class WaitlistManagementIntegrationTest extends ApiTestSupport {
 		String suffix = fullMrn.substring(fullMrn.length() - 4);
 
 		String body = mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 4A", "type", type.name(),
-				"mrn", fullMrn, "bed", "07"))
+				"mrn", fullMrn, "bed", "07", "priority", "routine"))
 				.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
 		long id = ((Number) JsonPath.read(body, "$.id")).longValue();
 
@@ -56,39 +64,50 @@ class WaitlistManagementIntegrationTest extends ApiTestSupport {
 				""", id);
 		assertThat(patient).containsEntry("mrn_suffix", suffix).containsEntry("mrn_hash", mrnHasher.hash(fullMrn)).containsEntry("bed", "07");
 
-		// The same patient again, now by the full MRN: no duplicate patient
-		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 4A", "type", type.name(), "mrn", fullMrn))
+		// The same patient again by the full MRN: no duplicate patient
+		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 4A", "type", type.name(), "mrn", fullMrn, "priority", "soon"))
 				.andExpect(status().isCreated());
 		assertThat(jdbc.queryForObject("select count(*) from patient where mrn_hash = ?", Integer.class, mrnHasher.hash(fullMrn))).isEqualTo(1);
 	}
 
 	@Test
-	void knownPatientCanBeGivenByLastFourDigits() throws Exception {
+	void urgentRequestsAreServedFirst() throws Exception {
 		TypeRef type = newType();
-		PatientRef patient = newPatient("Ward 4C", null);
-		String body = mvc.perform(jsonBody(withToken(post("/waitlist"), tokenFor(Role.OT_STAFF)),
-				"ward", "Ward 4C", "type", type.name(), "mrn", patient.suffix()))
-				.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-		long id = ((Number) JsonPath.read(body, "$.id")).longValue();
-		assertThat(jdbc.queryForObject("select patient_id from waitlist_request where id = ?", Long.class, id)).isEqualTo(patient.id());
+		long oldRoutine = newRequest("Ward 3A", type, Duration.ofDays(5));
+		jdbc.update("update waitlist_request set priority = 'routine' where id = ?", oldRoutine);
+		long newSoon = newRequest("Ward 4A", type, Duration.ofDays(1));
+		jdbc.update("update waitlist_request set priority = 'soon' where id = ?", newSoon);
+		long newUrgent = newRequest("Ward 6A", type, Duration.ofMinutes(1));
+		jdbc.update("update waitlist_request set priority = 'urgent' where id = ?", newUrgent);
+		newEquipment(type, "available", "OT store");
+
+		String body = mvc.perform(withToken(get("/waitlist"), tokenFor(Role.OT_STAFF))).andReturn().getResponse().getContentAsString();
+		List<Map<String, Object>> mine = JsonPath.read(body, "$[?(@.type == '" + type.name() + "')]");
+		assertThat(mine).extracting(e -> ((Number) e.get("id")).longValue()).containsExactly(newUrgent, newSoon, oldRoutine);
+		assertThat(mine).extracting(e -> e.get("availableNow")).containsExactly(true, false, false);
 	}
 
 	@Test
 	void createErrors() throws Exception {
 		String token = tokenFor(Role.OT_STAFF);
 		TypeRef type = newType();
-		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "OT store", "type", type.name()))
+		PatientRef patient = newPatient("Ward 3A", null);
+		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "OT store", "type", type.name(), "mrn", patient.suffix(), "priority", "soon"))
 				.andExpect(status().isBadRequest()).andExpect(content().string("Unknown ward OT store"));
-		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 3A", "type", "Hoist"))
+		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 3A", "type", "Hoist", "mrn", patient.suffix(), "priority", "soon"))
 				.andExpect(status().isBadRequest()).andExpect(content().string("Unknown equipment type Hoist"));
-		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "type", type.name()))
-				.andExpect(status().isBadRequest()).andExpect(content().string("Choose a ward"));
-		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 3A", "type", type.name(), "mrn", "12"))
+		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 3A", "type", type.name(), "priority", "soon"))
+				.andExpect(status().isBadRequest()).andExpect(content().string("Enter the patient's MRN"));
+		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 3A", "type", type.name(), "mrn", patient.suffix()))
+				.andExpect(status().isBadRequest()).andExpect(content().string("Choose a priority"));
+		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 3A", "type", type.name(), "mrn", patient.suffix(), "priority", "asap"))
+				.andExpect(status().isBadRequest()).andExpect(content().string("Priority must be urgent, soon or routine"));
+		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 3A", "type", type.name(), "mrn", "12", "priority", "soon"))
 				.andExpect(status().isBadRequest()).andExpect(content().string("Enter at least the last 4 digits of the MRN"));
 
-		PatientRef unknownSuffix = newPatient("Ward 3A", null);
-		jdbc.update("delete from patient where id = ?", unknownSuffix.id());
-		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 3A", "type", type.name(), "mrn", unknownSuffix.suffix()))
+		PatientRef gone = newPatient("Ward 3A", null);
+		jdbc.update("delete from patient where id = ?", gone.id());
+		mvc.perform(jsonBody(withToken(post("/waitlist"), token), "ward", "Ward 3A", "type", type.name(), "mrn", gone.suffix(), "priority", "soon"))
 				.andExpect(status().isBadRequest()).andExpect(content().string("Enter the full MRN to add a new patient"));
 	}
 

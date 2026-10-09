@@ -8,8 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface WaitlistRepository extends JpaRepository<WaitlistRequest, Long> {
 
-	// Oldest first: the order requests are served in
-	@EntityGraph(attributePaths = { "ward", "type.category" })
+	// Oldest first; WaitlistRequest.QUEUE_ORDER then puts urgent requests ahead
+	@EntityGraph(attributePaths = { "ward", "type.category", "patient" })
 	@Query("select w from WaitlistRequest w where w.status = nhs.ot.equiptrack.waitlist.WaitlistRequest.Status.OPEN order by w.requestedAt, w.id")
 	List<WaitlistRequest> findOpenOldestFirst();
 

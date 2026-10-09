@@ -90,7 +90,7 @@ class DischargeIntegrationTest extends ApiTestSupport {
 				.andExpect(jsonPath("$.override.reason").value("Transferred with chair"));
 		mvc.perform(jsonBody(withToken(post("/discharge/" + patient.suffix() + "/override"), token), "reason", "Again"))
 				.andExpect(status().isConflict())
-				.andExpect(content().string("An override for this patient is already waiting for a supervisor"));
+				.andExpect(content().string("An override for this patient is already waiting for a manager"));
 	}
 
 	@Test
