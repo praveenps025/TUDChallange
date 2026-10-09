@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import Icon from "../components/Icon";
 import { AppBar, BottomNav, Loading } from "../components/ui";
+import { firstName, useAuth } from "../auth";
 import useApi from "../useApi";
 
 function greeting() {
@@ -9,6 +10,7 @@ function greeting() {
 }
 
 export default function Home() {
+  const { user } = useAuth();
   const { data, error } = useApi("/home");
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
@@ -17,7 +19,7 @@ export default function Home() {
       <AppBar title="Home" />
       {!data ? <Loading error={error} /> : (
         <>
-          <h1>{greeting()}, {data.user}</h1>
+          <h1>{greeting()}, {firstName(user)}</h1>
           <p className="sub">{data.team} · {today}</p>
 
           <div className="section"><h2>To do</h2><span className="muted">{data.tasks.length} tasks</span></div>

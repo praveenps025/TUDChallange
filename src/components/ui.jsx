@@ -1,5 +1,6 @@
 import { Link, NavLink } from "react-router-dom";
 import Icon from "./Icon";
+import { firstName, initials, useAuth } from "../auth";
 
 // Sync pill in the header: synced, saving, offline
 const SYNC = {
@@ -8,13 +9,19 @@ const SYNC = {
   offline: ["offline", "cloudoff", "Offline"],
 };
 
+// The signed-in name is always visible, so on shared devices staff can see whose session it is
 export function AppBar({ title, sync = "synced" }) {
+  const { user } = useAuth();
   const [kind, icon, text] = SYNC[sync];
   return (
     <header className="appbar">
       <Link className="mark" to="/" aria-label="Home"><Icon name="scan" /></Link>
-      <div><span className="eyebrow">EQUIPTRACK OT</span><span className="page">{title}</span></div>
-      <span className={`pill ${kind}`}><Icon name={icon} />{text}</span>
+      <div>
+        <span className="eyebrow">EQUIPTRACK OT{user && ` · ${firstName(user).toUpperCase()}`}</span>
+        <span className="page">{title}</span>
+      </div>
+      <span className={`pill ${kind}`}><Icon name={icon} /><span className="text">{text}</span></span>
+      {user && <Link className="avatar" to="/me" aria-label={`Signed in as ${user.name}. Account and sign out`}>{initials(user)}</Link>}
     </header>
   );
 }

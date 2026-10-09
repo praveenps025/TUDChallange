@@ -212,3 +212,36 @@ select.chip { appearance: auto; }
 .category h3 { margin: 0; font-size: 1.15rem; }
 .bar { display: flex; height: 14px; margin: 12px 0 8px; border-radius: 6px; overflow: hidden; gap: 2px; }
 .bar span { background: var(--dot); }
+
+/* ---------- Signed-in user (app bar) ---------- */
+.appbar > div { min-width: 0; }
+.appbar .eyebrow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.appbar .avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; flex: none;
+                  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 0.9rem; }
+@media (max-width: 400px) { .appbar .pill { padding: 6px; } .appbar .pill .text { display: none; } }
+
+/* ---------- Forms (login, account, users) ---------- */
+input[type=password], select.input { width: 100%; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card);
+                                     color: var(--text); font: inherit; font-size: 1.05rem; }
+input[type=password]:focus, select.input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.stack { display: grid; gap: 16px; }
+.field { display: grid; gap: 8px; }
+.field > span { font-weight: 600; }
+.field.inline { display: flex; align-items: center; justify-content: space-between; }
+
+/* ---------- Login ---------- */
+.login { padding-top: 56px; }
+.login .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 36px; }
+.login .brand .mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: var(--accent); color: var(--on-accent); }
+.login .brand .eyebrow { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em; color: var(--muted); }
+.login form { margin-top: 28px; }
+.login .callout { margin-top: 20px; }
+
+/* ---------- Account and users ---------- */
+.profile { display: flex; align-items: center; gap: 16px; }
+.profile .avatar { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; flex: none;
+                   background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 1.2rem; }
+.profile .name { font-size: 1.25rem; font-weight: 600; }
+.row .pill { flex: none; }
+.editor { margin-top: 12px; }
+.editor h2 { margin-bottom: 4px; }

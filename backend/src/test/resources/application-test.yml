@@ -1,0 +1,6 @@
+# Integration tests: Postgres comes from Testcontainers; fixed, test-only secrets.
+app:
+  jwt:
+    secret: test-only-secret-that-is-at-least-32-bytes-long
+  mrn:
+    hash-key: test-only-mrn-key

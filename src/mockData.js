@@ -12,7 +12,13 @@
 //   POST /discharge/:mrn/override     { reason }
 //   GET  /insights                    monthly overview
 //
+//   POST /auth/login                  { username, password } -> { token, expiresAt, user }
+//   GET  /auth/me                     signed-in user
+//   POST /auth/change-password        { currentPassword, newPassword }
+//   GET  /users, POST /users, PUT /users/:id, POST /users/:id/reset-password   (managers only)
+//
 // Item status is one of: available, issued, inspect, missing.
+// In sample-data mode any password works for the users below.
 import { ApiError } from "./api";
 
 const equipment = {
@@ -46,6 +52,24 @@ const patients = {
   "4821": { mrn: "4821", ward: "Ward 4C", bed: "06", items: ["WC-018"], override: null },
 };
 
+const users = [
+  { id: 1, username: "alex.morgan", name: "Alex Morgan", team: "OT equipment team", role: "MANAGER", active: true, locked: false, lastLoginAt: null },
+  { id: 2, username: "jordan.lee", name: "Jordan Lee", team: "OT equipment team", role: "MANAGER", active: true, locked: false, lastLoginAt: null },
+  { id: 3, username: "sam.patel", name: "Sam Patel", team: "OT equipment team", role: "OT_STAFF", active: true, locked: false, lastLoginAt: null },
+  { id: 4, username: "riley.chen", name: "Riley Chen", team: "OT equipment team", role: "OT_STAFF", active: true, locked: false, lastLoginAt: null },
+];
+const TOKEN_HOURS = 8;
+const summary = u => ({ name: u.name, team: u.team, role: u.role });
+const findUser = username => users.find(u => u.username.toLowerCase() === username?.trim().toLowerCase());
+
+function managerOnly(me) {
+  if (me.role !== "MANAGER") throw new ApiError(403, "You don't have permission to do that");
+}
+
+function checkPassword(password) {
+  if (!password || password.length < 8 || password.length > 72) throw new ApiError(400, "Passwords must be 8 to 72 characters");
+}
+
 const now = () => new Date().toTimeString().slice(0, 5);
 const log = (icon, title, detail) => activity.unshift({ icon, title, detail, time: now() });
 
@@ -67,8 +91,64 @@ function withAvailability() {
 }
 
 const routes = {
-  "GET /home": () => ({
-    user: "Alex",
+  "POST /auth/login": (_, { username, password }) => {
+    if (!username?.trim()) throw new ApiError(400, "Enter your username");
+    if (!password) throw new ApiError(400, "Enter your password");
+    const user = findUser(username);
+    if (!user) throw new ApiError(401, "Incorrect username or password");
+    if (!user.active) throw new ApiError(401, "This account has been deactivated. Ask a manager to reactivate it.");
+    user.lastLoginAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + TOKEN_HOURS * 3600 * 1000).toISOString();
+    return { token: `mock:${user.username}`, expiresAt, user: summary(user) };
+  },
+
+  "GET /auth/me": (_, __, me) => summary(me),
+
+  "POST /auth/change-password": (_, { currentPassword, newPassword }) => {
+    if (!currentPassword) throw new ApiError(400, "Enter your current password");
+    if (!newPassword || newPassword.length < 8 || newPassword.length > 72) throw new ApiError(400, "The new password must be 8 to 72 characters");
+    if (newPassword === currentPassword) throw new ApiError(400, "Choose a password different from your current one");
+    return null;
+  },
+
+  "GET /users": (_, __, me) => {
+    managerOnly(me);
+    return [...users].sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  "POST /users": (_, { username, name, team, role, password }, me) => {
+    managerOnly(me);
+    if (!/^[A-Za-z0-9._-]{3,60}$/.test(username?.trim() ?? "")) throw new ApiError(400, "Usernames are 3 to 60 letters, numbers, dots, dashes or underscores");
+    if (!name?.trim()) throw new ApiError(400, "Enter a name");
+    if (!team?.trim()) throw new ApiError(400, "Enter a team");
+    checkPassword(password);
+    if (findUser(username)) throw new ApiError(409, `The username ${username.trim()} is already taken`);
+    const user = { id: Math.max(...users.map(u => u.id)) + 1, username: username.trim(), name: name.trim(), team: team.trim(), role, active: true, locked: false, lastLoginAt: null };
+    users.push(user);
+    return user;
+  },
+
+  "PUT /users/:id": ({ id }, { name, team, role, active }, me) => {
+    managerOnly(me);
+    const user = users.find(u => u.id === Number(id));
+    if (!user) throw new ApiError(404, "User not found");
+    if (!name?.trim()) throw new ApiError(400, "Enter a name");
+    if (!team?.trim()) throw new ApiError(400, "Enter a team");
+    if (user === me && (!active || role !== "MANAGER")) throw new ApiError(409, "You can't deactivate your own account or remove your own manager role");
+    return Object.assign(user, { name: name.trim(), team: team.trim(), role, active });
+  },
+
+  "POST /users/:id/reset-password": ({ id }, { password }, me) => {
+    managerOnly(me);
+    const user = users.find(u => u.id === Number(id));
+    if (!user) throw new ApiError(404, "User not found");
+    checkPassword(password);
+    user.locked = false;
+    return null;
+  },
+
+  "GET /home": (_, __, me) => ({
+    user: me.name.split(" ")[0],
     team: "OT equipment team",
     tasks: [
       { icon: "layers", title: "Allocate returned cushion", detail: "CU-024 · Ward 3A is next", to: "/return/CU-024" },
@@ -113,7 +193,7 @@ const routes = {
   "GET /audit": () => ({
     area: "Ward 3 · OT store",
     started: "09:10",
-    by: "Alex Morgan",
+    by: users[0].name,
     total: 41,
     found: 34,
     missing: Object.values(equipment).filter(e => e.status === "missing"),
@@ -160,12 +240,20 @@ function match(pattern, path) {
   return params;
 }
 
-export async function mockRequest(method, path, body = {}) {
+export async function mockRequest(method, path, body = {}, token) {
   await new Promise(resolve => setTimeout(resolve, 250)); // feel like a network call
+
+  // Tokens look like "mock:alex.morgan"; deactivated users are rejected like the real API
+  const me = token && findUser(token.replace(/^mock:/, ""));
+  if (path !== "/auth/login") {
+    if (!me) throw new ApiError(401, "Your session has expired. Please sign in again.");
+    if (!me.active) throw new ApiError(401, "This account has been deactivated. Ask a manager to reactivate it.");
+  }
+
   for (const [route, handler] of Object.entries(routes)) {
     const [routeMethod, pattern] = route.split(" ");
     const params = routeMethod === method && match(pattern, path);
-    if (params) return structuredClone(handler(params, body));
+    if (params) return structuredClone(handler(params, body ?? {}, me));
   }
   throw new ApiError(404, `No route for ${method} ${path}`);
 }
