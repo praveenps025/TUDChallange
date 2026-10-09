@@ -18,6 +18,8 @@ import nhs.ot.equiptrack.discharge.Patient;
 //
 //   available --issue--> issued --return (clean)-----> available
 //                                 --return (not clean)-> inspect --inspect--> available
+//   any (not found when an audit walk finishes) -------> missing
+//   missing --scanned on an audit walk---------------> inspect
 //
 // Each method runs inside the caller's transaction and logs one activity entry.
 // Two people acting on the same item at once are caught by the @Version
@@ -52,6 +54,9 @@ public class EquipmentLifecycle {
 		item.moveTo(clean ? EquipmentStatus.AVAILABLE : EquipmentStatus.INSPECT, store, now);
 		item.seen(now);
 		activity.log(ActivityLog.Kind.IN, item.getName() + " returned", item.getLabelCode() + " · " + store.getName(), user, item.getId());
+		// Write the closed loan now: Hibernate inserts before it updates, so a new
+		// loan in the same transaction would otherwise clash with "one open loan per item"
+		loans.flush();
 	}
 
 	public void inspect(CurrentUser user, Equipment item) {
@@ -62,6 +67,29 @@ public class EquipmentLifecycle {
 		item.moveTo(EquipmentStatus.AVAILABLE, item.getLocation(), now);
 		item.seen(now);
 		activity.log(ActivityLog.Kind.CLIPBOARD, item.getName() + " inspected", item.getLabelCode() + " · Available", user, item.getId());
+	}
+
+	// An item was scanned on an audit walk. A missing item has turned up and
+	// is checked before it is used again. Returns true if it had been missing.
+	public boolean sighted(CurrentUser user, Equipment item) {
+		Instant now = dates.now();
+		item.seen(now);
+		if (item.getStatus() != EquipmentStatus.MISSING) {
+			return false;
+		}
+		item.moveTo(EquipmentStatus.INSPECT, item.getLocation(), now);
+		activity.log(ActivityLog.Kind.CLIPBOARD, item.getName() + " found", item.getLabelCode() + " · Needs inspection", user, item.getId());
+		return true;
+	}
+
+	// Expected on an audit walk but not found. Any open loan stays open.
+	public void markMissing(CurrentUser user, Equipment item) {
+		if (item.getStatus() == EquipmentStatus.MISSING) {
+			return;
+		}
+		item.moveTo(EquipmentStatus.MISSING, item.getLocation(), dates.now());
+		activity.log(ActivityLog.Kind.CLIPBOARD, item.getName() + " reported missing",
+				item.getLabelCode() + " · Expected in " + item.getLocation().getName(), user, item.getId());
 	}
 
 	// dueOn is optional: staff may set it, otherwise the type's default loan length applies

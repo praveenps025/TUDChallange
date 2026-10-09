@@ -25,6 +25,7 @@ export default function Discharge() {
       reload();
     } catch (e) {
       setSaveError(e);
+      if (e.status === 409) reload();
     } finally {
       setSaving(false);
     }

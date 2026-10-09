@@ -55,6 +55,18 @@ public class AuditWalk {
 	protected AuditWalk() {
 	}
 
+	AuditWalk(String area, AppUser startedBy, Instant startedAt) {
+		this.area = area;
+		this.startedBy = startedBy;
+		this.startedAt = startedAt;
+	}
+
+	void close(long userId, Instant now) {
+		this.status = Status.CLOSED;
+		this.closedBy = userId;
+		this.closedAt = now;
+	}
+
 	public Long getId() {
 		return id;
 	}

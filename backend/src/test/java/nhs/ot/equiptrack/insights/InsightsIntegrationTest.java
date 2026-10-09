@@ -74,7 +74,7 @@ class InsightsIntegrationTest extends ApiTestSupport {
 
 		Map<String, Object> monthStart = jdbc.queryForMap("""
 				select count(*) as total, count(*) filter (where returned_at <= due_at) as on_time from loan
-				where returned_at >= date_trunc('month', now() at time zone 'Europe/London') at time zone 'Europe/London'
+				where returned_at >= date_trunc('month', now() at time zone 'Europe/Dublin') at time zone 'Europe/Dublin'
 				""");
 		long total = ((Number) monthStart.get("total")).longValue();
 		long inTime = ((Number) monthStart.get("on_time")).longValue();

@@ -39,6 +39,13 @@ public class Equipment {
 
 	private Instant statusChangedAt;
 
+	// Tracker details, searchable when a label is lost or damaged
+	private String assetNumber;
+
+	private String serialNumber;
+
+	private String model;
+
 	@Version
 	private long version;
 

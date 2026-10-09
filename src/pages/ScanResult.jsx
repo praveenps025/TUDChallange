@@ -27,6 +27,7 @@ export default function ScanResult() {
       reload();
     } catch (e) {
       setSaveError(e);
+      if (e.status === 409) reload(); // someone else changed it: show its current state
     } finally {
       setSaving(false);
     }

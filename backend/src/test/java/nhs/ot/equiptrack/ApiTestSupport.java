@@ -33,7 +33,7 @@ import nhs.ot.equiptrack.user.UserRepository;
 public abstract class ApiTestSupport {
 
 	protected static final String PASSWORD = "correct-horse-1";
-	protected static final ZoneId ZONE = ZoneId.of("Europe/London");
+	protected static final ZoneId ZONE = ZoneId.of("Europe/Dublin");
 
 	@Autowired
 	protected MockMvc mvc;

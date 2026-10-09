@@ -32,4 +32,8 @@ public class ActivityService {
 		return repository.findByOrderByOccurredAtDescIdDesc(Limit.of(count));
 	}
 
+	public List<Long> recentEquipmentIds(CurrentUser user, int count) {
+		return repository.findRecentEquipmentIds(user.id(), count);
+	}
+
 }

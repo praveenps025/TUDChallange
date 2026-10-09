@@ -62,6 +62,20 @@ public class WaitlistRequest {
 	protected WaitlistRequest() {
 	}
 
+	WaitlistRequest(Location ward, EquipmentType type, Patient patient, long requestedBy, Instant requestedAt) {
+		this.ward = ward;
+		this.type = type;
+		this.patient = patient;
+		this.requestedBy = requestedBy;
+		this.requestedAt = requestedAt;
+	}
+
+	void cancel(long userId, Instant now) {
+		this.status = Status.CANCELLED;
+		this.closedBy = userId;
+		this.closedAt = now;
+	}
+
 	public void allocate(long equipmentId, long userId, Instant now) {
 		this.status = Status.ALLOCATED;
 		this.allocatedEquipmentId = equipmentId;

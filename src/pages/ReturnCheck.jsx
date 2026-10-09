@@ -8,8 +8,8 @@ import useApi from "../useApi";
 export default function ReturnCheck() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data: item, error } = useApi(`/equipment/${encodeURIComponent(id)}`);
-  const { data: waitlist } = useApi("/waitlist");
+  const { data: item, error, reload } = useApi(`/equipment/${encodeURIComponent(id)}`);
+  const { data: waitlist, reload: reloadWaitlist } = useApi("/waitlist");
   const [clean, setClean] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -21,12 +21,17 @@ export default function ReturnCheck() {
     setSaving(true);
     setSaveError(null);
     try {
-      await post(`/equipment/${item.id}/return`, { clean });
-      if (clean && allocate && next) await post(`/waitlist/${next.id}/allocate`, { equipmentId: item.id });
+      // One call when allocating, so the item is never left returned but unallocated
+      if (clean && allocate && next) await post(`/equipment/${item.id}/return-and-allocate`, { requestId: next.id });
+      else await post(`/equipment/${item.id}/return`, { clean });
       navigate(`/item/${item.id}`);
     } catch (e) {
       setSaveError(e);
       setSaving(false);
+      if (e.status === 409) { // someone else got there first: show the current state
+        reload();
+        reloadWaitlist();
+      }
     }
   }
 

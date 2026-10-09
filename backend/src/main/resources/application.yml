@@ -20,6 +20,7 @@ spring:
       ddl-auto: validate # Flyway owns the schema
     properties:
       hibernate.jdbc.time_zone: UTC
+      hibernate.default_batch_fetch_size: 50 # load related rows for lists in batches
   flyway:
     locations: classpath:db/migration
 
@@ -59,7 +60,7 @@ app:
   login:
     max-failed-attempts: 5
     lock-duration: 15m
-  timezone: ${APP_TIMEZONE:Europe/London}  # the hospital's zone: "today", due dates, times shown
+  timezone: ${APP_TIMEZONE:Europe/Dublin}  # the hospital's zone: "today", due dates, times shown
   equipment:
     return-location: OT store     # where returned items go (a location name)
   home:

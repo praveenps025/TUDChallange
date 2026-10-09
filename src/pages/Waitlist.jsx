@@ -6,14 +6,14 @@ import { post } from "../api";
 import useApi from "../useApi";
 
 const SHOWN = 5;
-const MORE_TYPES = ["Wheelchair", "Sliding board"];
 
 export default function Waitlist() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const allocateId = params.get("allocate"); // set when issuing a scanned item
-  const { data: requests, error } = useApi("/waitlist");
-  const { data: item } = useApi(allocateId && `/equipment/${encodeURIComponent(allocateId)}`);
+  const { data: requests, error, reload } = useApi("/waitlist");
+  const { data: item, reload: reloadItem } = useApi(allocateId && `/equipment/${encodeURIComponent(allocateId)}`);
+  const { data: types } = useApi("/equipment-types");
   const [type, setType] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -21,6 +21,11 @@ export default function Waitlist() {
   const filter = item ? item.type : type;
   const list = (requests || []).filter(r => !filter || r.type === filter);
   const ready = (requests || []).filter(r => r.availableNow).length;
+
+  // The most requested type gets its own chip; the rest go under "More"
+  const waiting = name => (requests || []).filter(r => r.type === name).length;
+  const [main, ...more] = [...(types || [])].sort((a, b) => waiting(b.name) - waiting(a.name));
+  const moreNames = more.map(t => t.name);
 
   async function allocate(request) {
     setSaving(true);
@@ -31,6 +36,10 @@ export default function Waitlist() {
     } catch (e) {
       setSaveError(e);
       setSaving(false);
+      if (e.status === 409) { // the item or request changed: show the current state
+        reload();
+        reloadItem();
+      }
     }
   }
 
@@ -50,12 +59,14 @@ export default function Waitlist() {
           ) : (
             <div className="chips filters">
               <button className={`chip ${type === "" ? "on" : ""}`} onClick={() => setType("")}>All ({requests.length})</button>
-              <button className={`chip ${type === "Pressure cushion" ? "on" : ""}`} onClick={() => setType("Pressure cushion")}>Cushions</button>
-              <select className={`chip ${MORE_TYPES.includes(type) ? "on" : ""}`} value={MORE_TYPES.includes(type) ? type : ""}
-                      onChange={e => setType(e.target.value)} aria-label="More equipment types">
-                <option value="">More</option>
-                {MORE_TYPES.map(t => <option key={t}>{t}</option>)}
-              </select>
+              {main && <button className={`chip ${type === main.name ? "on" : ""}`} onClick={() => setType(main.name)}>{main.category}</button>}
+              {more.length > 0 && (
+                <select className={`chip ${moreNames.includes(type) ? "on" : ""}`} value={moreNames.includes(type) ? type : ""}
+                        onChange={e => setType(e.target.value)} aria-label="More equipment types">
+                  <option value="">More</option>
+                  {moreNames.map(t => <option key={t}>{t}</option>)}
+                </select>
+              )}
             </div>
           )}
 

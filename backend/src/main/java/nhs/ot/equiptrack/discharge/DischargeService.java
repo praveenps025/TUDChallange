@@ -3,6 +3,7 @@ package nhs.ot.equiptrack.discharge;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import nhs.ot.equiptrack.activity.ActivityLog;
@@ -13,6 +14,7 @@ import nhs.ot.equiptrack.common.Dates;
 import nhs.ot.equiptrack.equipment.EquipmentResponse;
 import nhs.ot.equiptrack.equipment.EquipmentViews;
 import nhs.ot.equiptrack.equipment.Loan;
+import nhs.ot.equiptrack.equipment.Location;
 import nhs.ot.equiptrack.equipment.LoanRepository;
 
 @Service
@@ -59,6 +61,33 @@ public class DischargeService {
 		activity.log(ActivityLog.Kind.CLIPBOARD, "Discharge override requested",
 				patient.getWard().getName() + " · MRN ••••" + patient.getMrnSuffix(), user, null);
 		return response(patient);
+	}
+
+	// The patient a waitlist request is for. A known patient can be given by the
+	// last four digits; a new one needs the full MRN so they are unique.
+	@Transactional(propagation = Propagation.MANDATORY)
+	public Patient findOrCreate(String mrn, Location ward, String bed) {
+		String digits = MrnHasher.digits(mrn);
+		if (digits.length() < 4) {
+			throw ApiException.badRequest("Enter at least the last 4 digits of the MRN");
+		}
+		if (digits.length() == 4) {
+			List<Patient> matches = patients.findByMrnSuffix(digits);
+			if (matches.isEmpty()) {
+				throw ApiException.badRequest("Enter the full MRN to add a new patient");
+			}
+			if (matches.size() > 1) {
+				throw ApiException.conflict("More than one patient has an MRN ending " + digits + ". Enter the full MRN.");
+			}
+			return matches.getFirst();
+		}
+		String hash = hasher.hash(digits);
+		return patients.findByMrnHash(hash)
+				.orElseGet(() -> patients.save(new Patient(hash, digits.substring(digits.length() - 4), ward, blankToNull(bed))));
+	}
+
+	private static String blankToNull(String value) {
+		return value == null || value.isBlank() ? null : value.trim();
 	}
 
 	// Staff usually type the last four digits; the full MRN resolves clashes
