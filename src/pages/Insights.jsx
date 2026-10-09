@@ -21,7 +21,7 @@ export default function Insights() {
             <div className="card"><span className="n">{data.tracked}</span><strong>Tracked</strong><span className="sub">All equipment</span></div>
             <Link className="card" to="/audit"><span className="n">{data.unaccounted}</span><strong>Unaccounted</strong><span className="sub">Review in audit</span></Link>
             <Link className="card" to="/waitlist"><span className="n">{data.waitlists}</span><strong>Waitlists</strong><span className="sub">{data.readyToAllocate} ready to allocate</span></Link>
-            <div className="card"><span className="n">{data.onTime}%</span><strong>On time</strong><span className="sub">Returns this month</span></div>
+            <div className="card"><span className="n">{data.onTime == null ? "–" : `${data.onTime}%`}</span><strong>On time</strong><span className="sub">Returns this month</span></div>
           </div>
 
           <div className="section"><h2 className="strong">By equipment category</h2></div>
@@ -31,7 +31,7 @@ export default function Insights() {
           <div className="list">
             {data.categories.map(c => (
               <div className="card category" key={c.name}>
-                <div className="head"><h3>{c.name}</h3><span className="pill info square">{c.advice}</span></div>
+                <div className="head"><h3>{c.name}</h3>{c.advice && <span className="pill info square">{c.advice}</span>}</div>
                 <div className="bar">
                   {PARTS.map(([key]) => <span key={key} title={`${c[key]} ${key}`} style={{ flex: c[key], "--dot": `var(--c-${key})` }} />)}
                 </div>

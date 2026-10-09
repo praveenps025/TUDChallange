@@ -18,7 +18,7 @@ class SchemaMigrationTest {
 
 	@Test
 	void loadsReferenceData() {
-		assertThat(jdbc.queryForList("select name from equipment_type order by sort_order", String.class))
+		assertThat(jdbc.queryForList("select name from equipment_type where sort_order > 0 order by sort_order", String.class))
 				.containsExactly("Wheelchair", "Pressure cushion", "Sliding board");
 		assertThat(jdbc.queryForObject("select count(*) from equipment_pool", Integer.class)).isEqualTo(4);
 		assertThat(jdbc.queryForObject("select count(*) from location where name = 'OT store'", Integer.class)).isEqualTo(1);

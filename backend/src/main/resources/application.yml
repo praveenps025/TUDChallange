@@ -59,6 +59,11 @@ app:
   login:
     max-failed-attempts: 5
     lock-duration: 15m
+  timezone: ${APP_TIMEZONE:Europe/London}  # the hospital's zone: "today", due dates, times shown
+  equipment:
+    return-location: OT store     # where returned items go (a location name)
+  home:
+    unseen-days: 7                # "Unseen items" task threshold
 
 ---
 spring:
@@ -66,8 +71,12 @@ spring:
     activate:
       on-profile: dev
   flyway:
-    # Dev-only seed data lives in its own folder so prod never loads it
+    # Dev-only seed data lives in its own folder so prod never loads it.
+    # Seeds are numbered Vn_1 so they run after migration n and before n+1.
     locations: classpath:db/migration,classpath:db/dev-seed
+    placeholders:
+      mrn_hash_key: ${app.mrn.hash-key}
+      app_timezone: ${app.timezone}
 
 ---
 spring:
