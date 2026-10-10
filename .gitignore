@@ -9,3 +9,7 @@ backend/target/
 *.iml
 .idea/
 .vscode/
+
+# demo jar build (see .github/workflows/main_equipment.yml)
+demo-build/
+caretrack-demo.jar

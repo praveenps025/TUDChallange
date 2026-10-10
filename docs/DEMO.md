@@ -20,7 +20,25 @@ npx vite preview       # opens it at http://localhost:4173
 
 (`npm run dev` with no `VITE_API_URL` set also runs on the sample data.)
 
-## Put it online — Azure Static Web Apps (free)
+## Put it online — Azure Web App "equipment" (set up)
+
+The repository deploys the demo to the Azure Web App **equipment** (Java 21,
+Linux) on every push to `main`, through `.github/workflows/main_equipment.yml`.
+The demo is packaged with a tiny JDK-only web server
+(`demo-server/DemoServer.java`) into `caretrack-demo.jar`, so it runs on App
+Service's Java runtime with **no database and no settings needed**.
+The address is on the Web App's Overview page, e.g. `https://equipment-….azurewebsites.net`.
+
+To try that jar on your computer:
+
+```bash
+npm run build:demo
+javac -d demo-build demo-server/DemoServer.java && cp -r dist demo-build/site
+jar --create --file caretrack-demo.jar --main-class DemoServer -C demo-build .
+PORT=8095 java -jar caretrack-demo.jar      # http://localhost:8095
+```
+
+## Or: Azure Static Web Apps (free)
 
 1. Push this repository to GitHub (done once).
 2. Azure portal → search **Static Web Apps** → **Create**:
