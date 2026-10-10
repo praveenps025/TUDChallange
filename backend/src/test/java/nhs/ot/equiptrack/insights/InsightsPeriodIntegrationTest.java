@@ -46,7 +46,7 @@ class InsightsPeriodIntegrationTest extends ApiTestSupport {
 
 	@Test
 	void thisYearIsLabelledWithTheYear() throws Exception {
-		mvc.perform(withToken(get("/insights").param("period", "this-year"), tokenFor(Role.MANAGER)))
+		mvc.perform(withToken(get("/api/insights").param("period", "this-year"), tokenFor(Role.MANAGER)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.period").value("this-year"))
 				.andExpect(jsonPath("$.month").value(String.valueOf(today().getYear())));
@@ -55,9 +55,9 @@ class InsightsPeriodIntegrationTest extends ApiTestSupport {
 	@Test
 	void defaultsToThisMonthAndRejectsUnknownPeriods() throws Exception {
 		String token = tokenFor(Role.MANAGER);
-		mvc.perform(withToken(get("/insights"), token))
+		mvc.perform(withToken(get("/api/insights"), token))
 				.andExpect(jsonPath("$.period").value("this-month"));
-		mvc.perform(withToken(get("/insights").param("period", "last-decade"), token))
+		mvc.perform(withToken(get("/api/insights").param("period", "last-decade"), token))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().string("Period must be this-month, last-month or this-year"));
 	}
@@ -74,7 +74,7 @@ class InsightsPeriodIntegrationTest extends ApiTestSupport {
 	}
 
 	private Map<String, Object> overview(String token, String period) throws Exception {
-		String body = mvc.perform(withToken(get("/insights").param("period", period), token))
+		String body = mvc.perform(withToken(get("/api/insights").param("period", period), token))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		return JsonPath.read(body, "$");
 	}

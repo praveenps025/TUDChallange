@@ -8,6 +8,9 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Query;
 
 public interface EquipmentRepository extends JpaRepository<Equipment, Long>, JpaSpecificationExecutor<Equipment> {
@@ -16,6 +19,12 @@ public interface EquipmentRepository extends JpaRepository<Equipment, Long>, Jpa
 	@EntityGraph(attributePaths = { "type.category", "location" })
 	@Query("select e from Equipment e where e.labelCode = upper(:labelCode)")
 	Optional<Equipment> findByLabel(String labelCode);
+
+	// For changes: locks the row, so two people acting on the same item at
+	// once are handled one after the other instead of deadlocking
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select e from Equipment e where e.labelCode = upper(:labelCode)")
+	Optional<Equipment> findByLabelForUpdate(String labelCode);
 
 	@EntityGraph(attributePaths = { "type.category", "location" })
 	List<Equipment> findByIdIn(Collection<Long> ids);

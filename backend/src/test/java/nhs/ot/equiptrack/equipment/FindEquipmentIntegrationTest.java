@@ -69,14 +69,14 @@ class FindEquipmentIntegrationTest extends ApiTestSupport {
 
 	@Test
 	void unknownWeightCategoryIs400() throws Exception {
-		mvc.perform(withToken(get("/equipment/available").param("weight", "Huge"), tokenFor(Role.OT_STAFF)))
+		mvc.perform(withToken(get("/api/equipment/available").param("weight", "Huge"), tokenFor(Role.OT_STAFF)))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().string("Unknown weight category Huge"));
 	}
 
 	@Test
 	void weightCategoriesAndRegistration() throws Exception {
-		mvc.perform(withToken(get("/weight-categories"), tokenFor(Role.OT_STAFF)))
+		mvc.perform(withToken(get("/api/weight-categories"), tokenFor(Role.OT_STAFF)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$[0].name").value("Underweight"))
 				.andExpect(jsonPath("$[3].name").value("Bariatric"))
@@ -84,12 +84,12 @@ class FindEquipmentIntegrationTest extends ApiTestSupport {
 
 		String token = tokenFor(Role.MANAGER);
 		TypeRef type = newType();
-		mvc.perform(withToken(post("/equipment"), token).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(withToken(post("/api/equipment"), token).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"type\":\"" + type.name() + "\",\"pool\":\"MAIN\",\"details\":{\"name\":\"Wide chair\",\"weightCategory\":\"overweight\"}}"))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.weightCategory").value("Overweight"))
 				.andExpect(jsonPath("$.weightMaxKg").value(170));
-		mvc.perform(withToken(post("/equipment"), token).contentType(MediaType.APPLICATION_JSON)
+		mvc.perform(withToken(post("/api/equipment"), token).contentType(MediaType.APPLICATION_JSON)
 				.content("{\"type\":\"" + type.name() + "\",\"pool\":\"MAIN\",\"details\":{\"name\":\"x\",\"weightCategory\":\"Giant\"}}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().string("Unknown weight category Giant"));
@@ -100,7 +100,7 @@ class FindEquipmentIntegrationTest extends ApiTestSupport {
 	}
 
 	private Map<String, Object> find(String token, String... params) throws Exception {
-		var request = get("/equipment/available");
+		var request = get("/api/equipment/available");
 		for (int i = 0; i < params.length; i += 2) {
 			request.param(params[i], params[i + 1]);
 		}

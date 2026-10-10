@@ -30,7 +30,7 @@ class DischargeApprovalIntegrationTest extends ApiTestSupport {
 
 		long id = requestOverride(tokenFor(staff), patient, "Family will return the chair");
 
-		String pending = mvc.perform(withToken(get("/discharge/overrides"), managerToken))
+		String pending = mvc.perform(withToken(get("/api/discharge/overrides"), managerToken))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		List<Map<String, Object>> mine = JsonPath.read(pending, "$[?(@.id == " + id + ")]");
 		assertThat(mine).singleElement().satisfies(o -> assertThat(o)
@@ -38,16 +38,16 @@ class DischargeApprovalIntegrationTest extends ApiTestSupport {
 				.containsEntry("reason", "Family will return the chair").containsEntry("requestedBy", staff.getDisplayName())
 				.containsEntry("itemsOut", 1));
 
-		mvc.perform(jsonBody(withToken(post("/discharge/overrides/" + id + "/approve"), managerToken), "reason", "Spoke to family"))
+		mvc.perform(jsonBody(withToken(post("/api/discharge/overrides/" + id + "/approve"), managerToken), "reason", "Spoke to family"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.override.status").value("approved"))
 				.andExpect(jsonPath("$.override.decidedBy").value(manager.getDisplayName()))
 				.andExpect(jsonPath("$.override.decisionReason").value("Spoke to family"))
 				.andExpect(jsonPath("$.override.requestedBy").value(staff.getDisplayName()));
 
-		String after = mvc.perform(withToken(get("/discharge/overrides"), managerToken)).andReturn().getResponse().getContentAsString();
+		String after = mvc.perform(withToken(get("/api/discharge/overrides"), managerToken)).andReturn().getResponse().getContentAsString();
 		assertThat((List<?>) JsonPath.read(after, "$[?(@.id == " + id + ")]")).isEmpty();
-		mvc.perform(jsonBody(withToken(post("/discharge/overrides/" + id + "/reject"), managerToken), "reason", "Too late"))
+		mvc.perform(jsonBody(withToken(post("/api/discharge/overrides/" + id + "/reject"), managerToken), "reason", "Too late"))
 				.andExpect(status().isConflict())
 				.andExpect(content().string("This request has already been approved"));
 	}
@@ -59,7 +59,7 @@ class DischargeApprovalIntegrationTest extends ApiTestSupport {
 		issuedEquipment(newType(), "Ward 4C", patient.id(), today());
 
 		long id = requestOverride(staffToken, patient, "Chair is with family");
-		mvc.perform(jsonBody(withToken(post("/discharge/overrides/" + id + "/reject"), tokenFor(Role.MANAGER)), "reason", "Return the chair first"))
+		mvc.perform(jsonBody(withToken(post("/api/discharge/overrides/" + id + "/reject"), tokenFor(Role.MANAGER)), "reason", "Return the chair first"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.override.status").value("rejected"))
 				.andExpect(jsonPath("$.override.decisionReason").value("Return the chair first"));
@@ -73,7 +73,7 @@ class DischargeApprovalIntegrationTest extends ApiTestSupport {
 		PatientRef patient = newPatient("Ward 4C", today());
 		issuedEquipment(newType(), "Ward 4C", patient.id(), today());
 
-		mvc.perform(jsonBody(withToken(post("/discharge/" + patient.suffix() + "/override"), tokenFor(manager)), "reason", "Equipment going home with patient"))
+		mvc.perform(jsonBody(withToken(post("/api/discharge/" + patient.suffix() + "/override"), tokenFor(manager)), "reason", "Equipment going home with patient"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.override.status").value("approved"))
 				.andExpect(jsonPath("$.override.decidedBy").value(manager.getDisplayName()))
@@ -86,12 +86,12 @@ class DischargeApprovalIntegrationTest extends ApiTestSupport {
 		PatientRef patient = newPatient("Ward 4C", today());
 		long id = requestOverride(staffToken, patient, "Please");
 
-		mvc.perform(withToken(get("/discharge/overrides"), staffToken)).andExpect(status().isForbidden());
-		mvc.perform(jsonBody(withToken(post("/discharge/overrides/" + id + "/approve"), staffToken), "reason", "Self approve"))
+		mvc.perform(withToken(get("/api/discharge/overrides"), staffToken)).andExpect(status().isForbidden());
+		mvc.perform(jsonBody(withToken(post("/api/discharge/overrides/" + id + "/approve"), staffToken), "reason", "Self approve"))
 				.andExpect(status().isForbidden());
-		mvc.perform(jsonBody(withToken(post("/discharge/overrides/" + id + "/approve"), tokenFor(Role.MANAGER)), "reason", " "))
+		mvc.perform(jsonBody(withToken(post("/api/discharge/overrides/" + id + "/approve"), tokenFor(Role.MANAGER)), "reason", " "))
 				.andExpect(status().isBadRequest()).andExpect(content().string("A reason is required"));
-		mvc.perform(jsonBody(withToken(post("/discharge/overrides/999999/approve"), tokenFor(Role.MANAGER)), "reason", "x"))
+		mvc.perform(jsonBody(withToken(post("/api/discharge/overrides/999999/approve"), tokenFor(Role.MANAGER)), "reason", "x"))
 				.andExpect(status().isNotFound()).andExpect(content().string("Override request not found"));
 	}
 
@@ -101,16 +101,16 @@ class DischargeApprovalIntegrationTest extends ApiTestSupport {
 		PatientRef patient = newPatient("Ward 4C", null);
 		requestOverride(tokenFor(Role.OT_STAFF), patient, "Please");
 
-		String body = mvc.perform(withToken(get("/home"), tokenFor(Role.MANAGER))).andReturn().getResponse().getContentAsString();
+		String body = mvc.perform(withToken(get("/api/home"), tokenFor(Role.MANAGER))).andReturn().getResponse().getContentAsString();
 		List<Map<String, String>> tasks = JsonPath.read(body, "$.tasks");
 		assertThat(tasks).anyMatch(t -> t.get("title").equals("Approve discharge") && t.get("to").equals("/discharge?mrn=" + patient.suffix()));
 
-		String staffHome = mvc.perform(withToken(get("/home"), tokenFor(Role.OT_STAFF))).andReturn().getResponse().getContentAsString();
+		String staffHome = mvc.perform(withToken(get("/api/home"), tokenFor(Role.OT_STAFF))).andReturn().getResponse().getContentAsString();
 		assertThat((List<Map<String, String>>) JsonPath.read(staffHome, "$.tasks")).noneMatch(t -> t.get("title").equals("Approve discharge"));
 	}
 
 	private long requestOverride(String token, PatientRef patient, String reason) throws Exception {
-		String body = mvc.perform(jsonBody(withToken(post("/discharge/" + patient.suffix() + "/override"), token), "reason", reason))
+		String body = mvc.perform(jsonBody(withToken(post("/api/discharge/" + patient.suffix() + "/override"), token), "reason", reason))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.override.status").value("requested"))
 				.andReturn().getResponse().getContentAsString();

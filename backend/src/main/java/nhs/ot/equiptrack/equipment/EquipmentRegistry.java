@@ -83,7 +83,7 @@ public class EquipmentRegistry {
 
 	@Transactional
 	public DetailsResponse update(CurrentUser user, String label, String poolCode, EquipmentDetails details) {
-		Equipment item = equipmentService.find(label);
+		Equipment item = equipmentService.findForUpdate(label);
 		item.update(details, pool(poolCode), weight(details.weightCategory()));
 		activity.log(ActivityLog.Kind.CLIPBOARD, item.getName() + " details updated", item.getLabelCode(), user, item.getId());
 		return toDetails(item);
@@ -91,7 +91,7 @@ public class EquipmentRegistry {
 
 	@Transactional
 	public DetailsResponse labelPrinted(CurrentUser user, String label) {
-		Equipment item = equipmentService.find(label);
+		Equipment item = equipmentService.findForUpdate(label);
 		boolean reprint = item.getLabelPrintedAt() != null;
 		item.labelPrinted(dates.now());
 		activity.log(ActivityLog.Kind.CLIPBOARD, reprint ? "Label reprinted" : "Label printed", item.getLabelCode(), user, item.getId());

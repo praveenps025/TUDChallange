@@ -49,7 +49,7 @@ class WaitlistIntegrationTest extends ApiTestSupport {
 		long request = newRequest("Ward 3A", type, Duration.ofDays(2), patient.id());
 		String label = newEquipment(type, "available", "OT store");
 
-		mvc.perform(jsonBody(withToken(post("/waitlist/" + request + "/allocate"), tokenFor(user)), "equipmentId", label.toLowerCase()))
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/" + request + "/allocate"), tokenFor(user)), "equipmentId", label.toLowerCase()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(label))
 				.andExpect(jsonPath("$.status").value("issued"))
@@ -75,7 +75,7 @@ class WaitlistIntegrationTest extends ApiTestSupport {
 		String label = newEquipment(type, "available", "OT store");
 		LocalDate due = today().plusDays(3);
 
-		mvc.perform(jsonBody(withToken(post("/waitlist/" + request + "/allocate"), tokenFor(Role.OT_STAFF)),
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/" + request + "/allocate"), tokenFor(Role.OT_STAFF)),
 				"equipmentId", label, "dueOn", due.toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.note").value("Loaned today · Due " + day(due)));
@@ -90,34 +90,34 @@ class WaitlistIntegrationTest extends ApiTestSupport {
 		String issued = newEquipment(type, "issued", "Ward 2B");
 		String otherType = newEquipment(newType(), "available", "OT store");
 
-		mvc.perform(jsonBody(withToken(post("/waitlist/999999/allocate"), token), "equipmentId", available))
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/999999/allocate"), token), "equipmentId", available))
 				.andExpect(status().isNotFound()).andExpect(content().string("Request not found"));
-		mvc.perform(jsonBody(withToken(post("/waitlist/" + request + "/allocate"), token), "equipmentId", "NOPE-4"))
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/" + request + "/allocate"), token), "equipmentId", "NOPE-4"))
 				.andExpect(status().isNotFound()).andExpect(content().string("No equipment with ID NOPE-4"));
-		mvc.perform(jsonBody(withToken(post("/waitlist/" + request + "/allocate"), token), "equipmentId", issued))
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/" + request + "/allocate"), token), "equipmentId", issued))
 				.andExpect(status().isConflict()).andExpect(content().string(issued + " can't be allocated to this request"));
-		mvc.perform(jsonBody(withToken(post("/waitlist/" + request + "/allocate"), token), "equipmentId", otherType))
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/" + request + "/allocate"), token), "equipmentId", otherType))
 				.andExpect(status().isConflict()).andExpect(content().string(otherType + " can't be allocated to this request"));
-		mvc.perform(jsonBody(withToken(post("/waitlist/" + request + "/allocate"), token)))
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/" + request + "/allocate"), token)))
 				.andExpect(status().isBadRequest()).andExpect(content().string("Choose the item to allocate"));
-		mvc.perform(jsonBody(withToken(post("/waitlist/" + request + "/allocate"), token),
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/" + request + "/allocate"), token),
 				"equipmentId", available, "dueOn", today().minusDays(1).toString()))
 				.andExpect(status().isBadRequest()).andExpect(content().string("The due date can't be in the past"));
-		mvc.perform(jsonBody(withToken(post("/waitlist/abc/allocate"), token), "equipmentId", available))
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/abc/allocate"), token), "equipmentId", available))
 				.andExpect(status().isBadRequest());
 
 		// Nothing above changed anything
 		assertThat(statusOf(available)).isEqualTo("available");
 		assertThat(entriesFor(type)).hasSize(1);
 
-		mvc.perform(jsonBody(withToken(post("/waitlist/" + request + "/allocate"), token), "equipmentId", available))
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/" + request + "/allocate"), token), "equipmentId", available))
 				.andExpect(status().isOk());
-		mvc.perform(jsonBody(withToken(post("/waitlist/" + request + "/allocate"), token), "equipmentId", newEquipment(type, "available", "OT store")))
+		mvc.perform(jsonBody(withToken(post("/api/waitlist/" + request + "/allocate"), token), "equipmentId", newEquipment(type, "available", "OT store")))
 				.andExpect(status().isConflict()).andExpect(content().string("This request has already been allocated"));
 	}
 
 	private List<Map<String, Object>> entriesFor(TypeRef type) throws Exception {
-		String body = mvc.perform(withToken(get("/waitlist"), tokenFor(Role.OT_STAFF)))
+		String body = mvc.perform(withToken(get("/api/waitlist"), tokenFor(Role.OT_STAFF)))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		return JsonPath.read(body, "$[?(@.type == '" + type.name() + "')]");
 	}

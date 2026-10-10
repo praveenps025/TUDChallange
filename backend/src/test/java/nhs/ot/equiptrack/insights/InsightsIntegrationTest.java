@@ -69,7 +69,7 @@ class InsightsIntegrationTest extends ApiTestSupport {
 		String late = issuedEquipment(type, "Ward 2B", null, today().minusDays(1));
 		String token = tokenFor(Role.MANAGER);
 		for (String label : new String[] { onTime, late }) {
-			mvc.perform(jsonBody(withToken(post("/equipment/" + label + "/return"), token), "clean", true)).andExpect(status().isOk());
+			mvc.perform(jsonBody(withToken(post("/api/equipment/" + label + "/return"), token), "clean", true)).andExpect(status().isOk());
 		}
 
 		Map<String, Object> monthStart = jdbc.queryForMap("""
@@ -82,7 +82,7 @@ class InsightsIntegrationTest extends ApiTestSupport {
 	}
 
 	private Map<String, Object> overview() throws Exception {
-		String body = mvc.perform(withToken(get("/insights"), tokenFor(Role.MANAGER)))
+		String body = mvc.perform(withToken(get("/api/insights"), tokenFor(Role.MANAGER)))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		return JsonPath.read(body, "$");
 	}

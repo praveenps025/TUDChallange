@@ -39,7 +39,7 @@ class AuditIntegrationTest extends ApiTestSupport {
 		String started = jdbc.queryForObject("select started_at from audit_walk where id = ?", java.sql.Timestamp.class, walk)
 				.toInstant().atZone(ZONE).format(DateTimeFormatter.ofPattern("HH:mm"));
 
-		mvc.perform(withToken(get("/audit"), tokenFor(Role.OT_STAFF)))
+		mvc.perform(withToken(get("/api/audit"), tokenFor(Role.OT_STAFF)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.area").value("Test area"))
 				.andExpect(jsonPath("$.started").value(started))
@@ -54,7 +54,7 @@ class AuditIntegrationTest extends ApiTestSupport {
 	@Test
 	void noWalkInProgressIs404() throws Exception {
 		jdbc.update("update audit_walk set status = 'closed', closed_at = now() where status = 'open'");
-		mvc.perform(withToken(get("/audit"), tokenFor(Role.OT_STAFF)))
+		mvc.perform(withToken(get("/api/audit"), tokenFor(Role.OT_STAFF)))
 				.andExpect(status().isNotFound())
 				.andExpect(content().string("No audit walk is in progress"));
 	}

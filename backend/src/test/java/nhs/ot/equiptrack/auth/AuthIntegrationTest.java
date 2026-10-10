@@ -32,7 +32,7 @@ class AuthIntegrationTest extends ApiTestSupport {
 	@Test
 	void loginReturnsTokenAndUser() throws Exception {
 		AppUser user = createUser(Role.OT_STAFF);
-		mvc.perform(jsonBody(post("/auth/login"), "username", user.getUsername().toUpperCase(), "password", PASSWORD))
+		mvc.perform(jsonBody(post("/api/auth/login"), "username", user.getUsername().toUpperCase(), "password", PASSWORD))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.token", notNullValue()))
 				.andExpect(jsonPath("$.expiresAt", notNullValue()))
@@ -47,7 +47,7 @@ class AuthIntegrationTest extends ApiTestSupport {
 	void meReturnsTheTokensOwner() throws Exception {
 		AppUser user = createUser(Role.MANAGER);
 		String token = login(user.getUsername(), PASSWORD);
-		mvc.perform(withToken(get("/auth/me"), token))
+		mvc.perform(withToken(get("/api/auth/me"), token))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.name").value(user.getDisplayName()))
 				.andExpect(jsonPath("$.role").value("MANAGER"));
@@ -56,7 +56,7 @@ class AuthIntegrationTest extends ApiTestSupport {
 	@Test
 	void wrongPasswordIs401PlainText() throws Exception {
 		AppUser user = createUser(Role.OT_STAFF);
-		mvc.perform(jsonBody(post("/auth/login"), "username", user.getUsername(), "password", "wrong-password"))
+		mvc.perform(jsonBody(post("/api/auth/login"), "username", user.getUsername(), "password", "wrong-password"))
 				.andExpect(status().isUnauthorized())
 				.andExpect(header().string("Content-Type", "text/plain;charset=UTF-8"))
 				.andExpect(content().string(AuthService.BAD_LOGIN));
@@ -64,28 +64,28 @@ class AuthIntegrationTest extends ApiTestSupport {
 
 	@Test
 	void unknownUserIs401WithSameMessage() throws Exception {
-		mvc.perform(jsonBody(post("/auth/login"), "username", "nobody-here", "password", PASSWORD))
+		mvc.perform(jsonBody(post("/api/auth/login"), "username", "nobody-here", "password", PASSWORD))
 				.andExpect(status().isUnauthorized())
 				.andExpect(content().string(AuthService.BAD_LOGIN));
 	}
 
 	@Test
 	void blankCredentialsAre400() throws Exception {
-		mvc.perform(jsonBody(post("/auth/login"), "username", "", "password", PASSWORD))
+		mvc.perform(jsonBody(post("/api/auth/login"), "username", "", "password", PASSWORD))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().string("Enter your username"));
 	}
 
 	@Test
 	void requestsWithoutTokenAre401() throws Exception {
-		mvc.perform(get("/auth/me"))
+		mvc.perform(get("/api/auth/me"))
 				.andExpect(status().isUnauthorized())
 				.andExpect(content().string("Please sign in"));
 	}
 
 	@Test
 	void invalidTokenIs401() throws Exception {
-		mvc.perform(withToken(get("/auth/me"), "not-a-real-token"))
+		mvc.perform(withToken(get("/api/auth/me"), "not-a-real-token"))
 				.andExpect(status().isUnauthorized())
 				.andExpect(content().string("Your session has expired. Please sign in again."));
 	}
@@ -99,22 +99,22 @@ class AuthIntegrationTest extends ApiTestSupport {
 		String expired = jwtEncoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
 				.getTokenValue();
 
-		mvc.perform(withToken(get("/auth/me"), expired)).andExpect(status().isUnauthorized());
+		mvc.perform(withToken(get("/api/auth/me"), expired)).andExpect(status().isUnauthorized());
 	}
 
 	@Test
 	void locksAccountAfterRepeatedFailures() throws Exception {
 		AppUser user = createUser(Role.OT_STAFF);
 		for (int i = 1; i <= 4; i++) {
-			mvc.perform(jsonBody(post("/auth/login"), "username", user.getUsername(), "password", "wrong"))
+			mvc.perform(jsonBody(post("/api/auth/login"), "username", user.getUsername(), "password", "wrong"))
 					.andExpect(content().string(AuthService.BAD_LOGIN));
 		}
-		mvc.perform(jsonBody(post("/auth/login"), "username", user.getUsername(), "password", "wrong"))
+		mvc.perform(jsonBody(post("/api/auth/login"), "username", user.getUsername(), "password", "wrong"))
 				.andExpect(status().isUnauthorized())
 				.andExpect(content().string("Too many failed sign-in attempts. Try again in 15 minutes."));
 
 		// Even the right password is refused while locked
-		mvc.perform(jsonBody(post("/auth/login"), "username", user.getUsername(), "password", PASSWORD))
+		mvc.perform(jsonBody(post("/api/auth/login"), "username", user.getUsername(), "password", PASSWORD))
 				.andExpect(status().isUnauthorized())
 				.andExpect(content().string("Too many failed sign-in attempts. Try again in 15 minutes."));
 	}
@@ -123,10 +123,10 @@ class AuthIntegrationTest extends ApiTestSupport {
 	void successfulLoginResetsFailureCount() throws Exception {
 		AppUser user = createUser(Role.OT_STAFF);
 		for (int i = 0; i < 4; i++) {
-			mvc.perform(jsonBody(post("/auth/login"), "username", user.getUsername(), "password", "wrong"));
+			mvc.perform(jsonBody(post("/api/auth/login"), "username", user.getUsername(), "password", "wrong"));
 		}
 		login(user.getUsername(), PASSWORD);
-		mvc.perform(jsonBody(post("/auth/login"), "username", user.getUsername(), "password", "wrong"))
+		mvc.perform(jsonBody(post("/api/auth/login"), "username", user.getUsername(), "password", "wrong"))
 				.andExpect(content().string(AuthService.BAD_LOGIN));
 		login(user.getUsername(), PASSWORD);
 	}
@@ -139,9 +139,9 @@ class AuthIntegrationTest extends ApiTestSupport {
 		String otherUser = tokenFor(Role.MANAGER);
 
 		// Signing out is client-side, and new sign-ins don't end earlier sessions
-		mvc.perform(withToken(get("/auth/me"), phone)).andExpect(jsonPath("$.name").value(user.getDisplayName()));
-		mvc.perform(withToken(get("/auth/me"), desktop)).andExpect(jsonPath("$.name").value(user.getDisplayName()));
-		mvc.perform(withToken(get("/auth/me"), otherUser)).andExpect(jsonPath("$.role").value("MANAGER"));
+		mvc.perform(withToken(get("/api/auth/me"), phone)).andExpect(jsonPath("$.name").value(user.getDisplayName()));
+		mvc.perform(withToken(get("/api/auth/me"), desktop)).andExpect(jsonPath("$.name").value(user.getDisplayName()));
+		mvc.perform(withToken(get("/api/auth/me"), otherUser)).andExpect(jsonPath("$.role").value("MANAGER"));
 	}
 
 	@Test
@@ -149,28 +149,28 @@ class AuthIntegrationTest extends ApiTestSupport {
 		AppUser user = createUser(Role.OT_STAFF);
 		String token = login(user.getUsername(), PASSWORD);
 
-		mvc.perform(jsonBody(withToken(post("/auth/change-password"), token),
+		mvc.perform(jsonBody(withToken(post("/api/auth/change-password"), token),
 				"currentPassword", "wrong", "newPassword", "new-password-9"))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().string("Your current password is incorrect"));
 
-		mvc.perform(jsonBody(withToken(post("/auth/change-password"), token),
+		mvc.perform(jsonBody(withToken(post("/api/auth/change-password"), token),
 				"currentPassword", PASSWORD, "newPassword", "short"))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().string("The new password must be 8 to 72 characters"));
 
-		mvc.perform(jsonBody(withToken(post("/auth/change-password"), token),
+		mvc.perform(jsonBody(withToken(post("/api/auth/change-password"), token),
 				"currentPassword", PASSWORD, "newPassword", "new-password-9"))
 				.andExpect(status().isNoContent());
 
 		login(user.getUsername(), "new-password-9");
-		mvc.perform(jsonBody(post("/auth/login"), "username", user.getUsername(), "password", PASSWORD))
+		mvc.perform(jsonBody(post("/api/auth/login"), "username", user.getUsername(), "password", PASSWORD))
 				.andExpect(status().isUnauthorized());
 	}
 
 	@Test
 	void healthIsPublic() throws Exception {
-		mvc.perform(get("/actuator/health")).andExpect(status().isOk());
+		mvc.perform(get("/api/actuator/health")).andExpect(status().isOk());
 	}
 
 }

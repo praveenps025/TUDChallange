@@ -4,7 +4,9 @@ import java.nio.charset.StandardCharsets;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -50,8 +52,8 @@ public class ApiExceptionHandler {
 		return text(HttpStatus.BAD_REQUEST, "Invalid value for " + e.getName());
 	}
 
-	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-	ResponseEntity<String> concurrentUpdate(ObjectOptimisticLockingFailureException e) {
+	@ExceptionHandler({ ObjectOptimisticLockingFailureException.class, PessimisticLockingFailureException.class })
+	ResponseEntity<String> concurrentUpdate(ConcurrencyFailureException e) {
 		return text(HttpStatus.CONFLICT, CONCURRENT_UPDATE);
 	}
 

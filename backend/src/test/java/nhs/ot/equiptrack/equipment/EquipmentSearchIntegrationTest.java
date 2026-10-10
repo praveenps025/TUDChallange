@@ -56,15 +56,15 @@ class EquipmentSearchIntegrationTest extends ApiTestSupport {
 			newEquipment(type, "available", "OT store");
 		}
 		String token = tokenFor(Role.OT_STAFF);
-		mvc.perform(withToken(get("/equipment?type=" + type.name() + "&page=1&size=2"), token))
+		mvc.perform(withToken(get("/api/equipment?type=" + type.name() + "&page=1&size=2"), token))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.items.length()").value(1))
 				.andExpect(jsonPath("$.page").value(1))
 				.andExpect(jsonPath("$.size").value(2))
 				.andExpect(jsonPath("$.total").value(3));
-		mvc.perform(withToken(get("/equipment?size=500"), token))
+		mvc.perform(withToken(get("/api/equipment?size=500"), token))
 				.andExpect(status().isBadRequest());
-		mvc.perform(withToken(get("/equipment?status=lost"), token))
+		mvc.perform(withToken(get("/api/equipment?status=lost"), token))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().string("Unknown status lost. Use available, issued, inspect or missing."));
 	}
@@ -76,14 +76,14 @@ class EquipmentSearchIntegrationTest extends ApiTestSupport {
 		TypeRef type = newType();
 		String first = newEquipment(type, "inspect", "OT store");
 		String second = newEquipment(type, "inspect", "OT store");
-		mvc.perform(withToken(post("/equipment/" + first + "/inspect"), token)).andExpect(status().isOk());
-		mvc.perform(withToken(post("/equipment/" + second + "/inspect"), token)).andExpect(status().isOk());
+		mvc.perform(withToken(post("/api/equipment/" + first + "/inspect"), token)).andExpect(status().isOk());
+		mvc.perform(withToken(post("/api/equipment/" + second + "/inspect"), token)).andExpect(status().isOk());
 
-		String body = mvc.perform(withToken(get("/equipment/recent"), token)).andExpect(status().isOk())
+		String body = mvc.perform(withToken(get("/api/equipment/recent"), token)).andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsString();
 		assertThat((List<String>) JsonPath.read(body, "$[*].id")).containsExactly(second, first);
 
-		String someoneElse = mvc.perform(withToken(get("/equipment/recent"), tokenFor(Role.OT_STAFF)))
+		String someoneElse = mvc.perform(withToken(get("/api/equipment/recent"), tokenFor(Role.OT_STAFF)))
 				.andReturn().getResponse().getContentAsString();
 		assertThat((List<String>) JsonPath.read(someoneElse, "$[*].id")).doesNotContain(first, second);
 	}
@@ -92,15 +92,15 @@ class EquipmentSearchIntegrationTest extends ApiTestSupport {
 	void referenceListsComeFromTheDatabase() throws Exception {
 		TypeRef type = newType();
 		String token = tokenFor(Role.OT_STAFF);
-		mvc.perform(withToken(get("/equipment-types"), token))
+		mvc.perform(withToken(get("/api/equipment-types"), token))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$[?(@.name == 'Wheelchair')].category").value("Wheelchairs"))
 				.andExpect(jsonPath("$[?(@.name == '" + type.name() + "')].defaultLoanDays").value(14));
-		mvc.perform(withToken(get("/categories"), token))
+		mvc.perform(withToken(get("/api/categories"), token))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$[?(@.name == 'Cushions')].icon").value("layers"))
 				.andExpect(jsonPath("$[?(@.name == '" + type.category() + "')].types[0]").value(type.name()));
-		String wards = mvc.perform(withToken(get("/locations?kind=ward"), token))
+		String wards = mvc.perform(withToken(get("/api/locations?kind=ward"), token))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		assertThat((List<String>) JsonPath.read(wards, "$[*].kind")).containsOnly("ward");
 		assertThat((List<String>) JsonPath.read(wards, "$[*].name")).contains("Ward 3A").doesNotContain("OT store");
@@ -108,7 +108,7 @@ class EquipmentSearchIntegrationTest extends ApiTestSupport {
 
 	// query is "name=value&name=value", values unencoded
 	private List<String> ids(String token, String query) throws Exception {
-		var request = get("/equipment");
+		var request = get("/api/equipment");
 		for (String pair : query.split("&")) {
 			String[] parts = pair.split("=", 2);
 			request.param(parts[0], java.net.URLDecoder.decode(parts[1], java.nio.charset.StandardCharsets.UTF_8));

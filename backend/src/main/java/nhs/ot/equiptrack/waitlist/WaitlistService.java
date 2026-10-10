@@ -118,7 +118,7 @@ public class WaitlistService {
 	@Transactional
 	public EquipmentResponse allocate(CurrentUser user, long requestId, String equipmentId, LocalDate dueOn) {
 		WaitlistRequest request = findOpen(requestId);
-		Equipment item = equipmentService.find(equipmentId);
+		Equipment item = equipmentService.findForUpdate(equipmentId);
 		issue(user, request, item, dueOn);
 		return views.of(item);
 	}
@@ -128,7 +128,7 @@ public class WaitlistService {
 	@Transactional
 	public EquipmentResponse returnAndAllocate(CurrentUser user, String equipmentId, long requestId, LocalDate dueOn) {
 		WaitlistRequest request = findOpen(requestId);
-		Equipment item = equipmentService.find(equipmentId);
+		Equipment item = equipmentService.findForUpdate(equipmentId);
 		lifecycle.returnItem(user, item, true);
 		issue(user, request, item, dueOn);
 		return views.of(item);
@@ -151,7 +151,7 @@ public class WaitlistService {
 	}
 
 	private WaitlistRequest findOpen(long requestId) {
-		WaitlistRequest request = requests.findById(requestId).orElseThrow(() -> ApiException.notFound("Request not found"));
+		WaitlistRequest request = requests.findByIdForUpdate(requestId).orElseThrow(() -> ApiException.notFound("Request not found"));
 		if (request.getStatus() != WaitlistRequest.Status.OPEN) {
 			throw ApiException.conflict("This request has already been " + request.getStatus().name().toLowerCase());
 		}

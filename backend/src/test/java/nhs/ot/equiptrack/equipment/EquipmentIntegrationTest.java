@@ -32,7 +32,7 @@ class EquipmentIntegrationTest extends ApiTestSupport {
 		TypeRef type = newType();
 		String label = issuedEquipment(type, "Ward 2B", null, today());
 
-		mvc.perform(withToken(get("/equipment/" + label.toLowerCase()), tokenFor(Role.OT_STAFF)))
+		mvc.perform(withToken(get("/api/equipment/" + label.toLowerCase()), tokenFor(Role.OT_STAFF)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(label))
 				.andExpect(jsonPath("$.name").value("Test " + type.name()))
@@ -45,15 +45,15 @@ class EquipmentIntegrationTest extends ApiTestSupport {
 
 	@Test
 	void unknownItemIs404() throws Exception {
-		mvc.perform(withToken(get("/equipment/NOPE-1"), tokenFor(Role.OT_STAFF)))
+		mvc.perform(withToken(get("/api/equipment/NOPE-1"), tokenFor(Role.OT_STAFF)))
 				.andExpect(status().isNotFound())
 				.andExpect(content().string("No equipment with ID NOPE-1"));
 	}
 
 	@Test
 	void requiresSignIn() throws Exception {
-		mvc.perform(get("/equipment/CU-024")).andExpect(status().isUnauthorized());
-		mvc.perform(post("/equipment/CU-024/inspect")).andExpect(status().isUnauthorized());
+		mvc.perform(get("/api/equipment/CU-024")).andExpect(status().isUnauthorized());
+		mvc.perform(post("/api/equipment/CU-024/inspect")).andExpect(status().isUnauthorized());
 	}
 
 	@Test
@@ -61,7 +61,7 @@ class EquipmentIntegrationTest extends ApiTestSupport {
 		AppUser user = createUser(Role.OT_STAFF);
 		String label = issuedEquipment(newType(), "Ward 5A", null, today().plusDays(3));
 
-		mvc.perform(jsonBody(withToken(post("/equipment/" + label + "/return"), tokenFor(user)), "clean", true))
+		mvc.perform(jsonBody(withToken(post("/api/equipment/" + label + "/return"), tokenFor(user)), "clean", true))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("available"))
 				.andExpect(jsonPath("$.location").value("OT store"))
@@ -76,7 +76,7 @@ class EquipmentIntegrationTest extends ApiTestSupport {
 	@Test
 	void dirtyReturnNeedsInspection() throws Exception {
 		String label = issuedEquipment(newType(), "Ward 5A", null, today());
-		mvc.perform(jsonBody(withToken(post("/equipment/" + label + "/return"), tokenFor(Role.OT_STAFF)), "clean", false))
+		mvc.perform(jsonBody(withToken(post("/api/equipment/" + label + "/return"), tokenFor(Role.OT_STAFF)), "clean", false))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("inspect"))
 				.andExpect(jsonPath("$.note").value("Returned today · Needs inspection"));
@@ -87,13 +87,13 @@ class EquipmentIntegrationTest extends ApiTestSupport {
 		String token = tokenFor(Role.OT_STAFF);
 		String available = newEquipment(newType(), "available", "OT store");
 
-		mvc.perform(jsonBody(withToken(post("/equipment/" + available + "/return"), token), "clean", true))
+		mvc.perform(jsonBody(withToken(post("/api/equipment/" + available + "/return"), token), "clean", true))
 				.andExpect(status().isConflict())
 				.andExpect(content().string(available + " is not issued"));
-		mvc.perform(jsonBody(withToken(post("/equipment/" + available + "/return"), token)))
+		mvc.perform(jsonBody(withToken(post("/api/equipment/" + available + "/return"), token)))
 				.andExpect(status().isBadRequest())
 				.andExpect(content().string("Say whether the item is clean and undamaged"));
-		mvc.perform(jsonBody(withToken(post("/equipment/NOPE-2/return"), token), "clean", true))
+		mvc.perform(jsonBody(withToken(post("/api/equipment/NOPE-2/return"), token), "clean", true))
 				.andExpect(status().isNotFound());
 		assertThat(statusOf(available)).isEqualTo("available");
 	}
@@ -103,7 +103,7 @@ class EquipmentIntegrationTest extends ApiTestSupport {
 		AppUser user = createUser(Role.OT_STAFF);
 		String label = newEquipment(newType(), "inspect", "OT store");
 
-		mvc.perform(withToken(post("/equipment/" + label + "/inspect"), tokenFor(user)))
+		mvc.perform(withToken(post("/api/equipment/" + label + "/inspect"), tokenFor(user)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.status").value("available"));
 		assertThat(activityFor(label)).containsExactly("clipboard|Test " + typeNameOf(label) + " inspected|" + label + " · Available|" + user.getId());
@@ -113,10 +113,10 @@ class EquipmentIntegrationTest extends ApiTestSupport {
 	void inspectErrors() throws Exception {
 		String token = tokenFor(Role.OT_STAFF);
 		String label = newEquipment(newType(), "available", "OT store");
-		mvc.perform(withToken(post("/equipment/" + label + "/inspect"), token))
+		mvc.perform(withToken(post("/api/equipment/" + label + "/inspect"), token))
 				.andExpect(status().isConflict())
 				.andExpect(content().string(label + " doesn't need inspection"));
-		mvc.perform(withToken(post("/equipment/NOPE-3/inspect"), token)).andExpect(status().isNotFound());
+		mvc.perform(withToken(post("/api/equipment/NOPE-3/inspect"), token)).andExpect(status().isNotFound());
 	}
 
 	// Several people return the same item at the same moment: exactly one wins,
@@ -135,7 +135,7 @@ class EquipmentIntegrationTest extends ApiTestSupport {
 		for (String token : tokens) {
 			Callable<MockHttpServletResponse> call = () -> {
 				start.await();
-				return mvc.perform(jsonBody(withToken(post("/equipment/" + label + "/return"), token), "clean", true))
+				return mvc.perform(jsonBody(withToken(post("/api/equipment/" + label + "/return"), token), "clean", true))
 						.andReturn().getResponse();
 			};
 			results.add(pool.submit(call));

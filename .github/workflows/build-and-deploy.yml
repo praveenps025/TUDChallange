@@ -1,0 +1,94 @@
+# Builds the React app into the Spring Boot jar, runs every test, and on a
+# push to main deploys the jar to Azure App Service. Setup: docs/DEPLOYMENT.md
+name: Build, test and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build the React app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      # Integration tests start a throwaway Postgres with Testcontainers,
+      # using the Docker engine that GitHub's runners already have
+      - name: Test and package the backend (includes the React app)
+        working-directory: backend
+        run: ./mvnw -B verify
+
+      - name: Keep test reports if something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: backend/target/surefire-reports
+          retention-days: 7
+
+      - name: Keep the jar for deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: equiptrack-jar
+          path: backend/target/equiptrack.jar
+          retention-days: 14
+
+  deploy:
+    name: Deploy to Azure
+    needs: build
+    # Only from main, and only once the Azure app name has been set (Settings > Variables)
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.AZURE_WEBAPP_NAME != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    permissions:
+      contents: read
+      id-token: write # sign in to Azure with OpenID Connect; no stored passwords
+    steps:
+      - name: Download the jar
+        uses: actions/download-artifact@v4
+        with:
+          name: equiptrack-jar
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to App Service
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: equiptrack.jar

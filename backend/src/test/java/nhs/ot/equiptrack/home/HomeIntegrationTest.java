@@ -33,7 +33,7 @@ class HomeIntegrationTest extends ApiTestSupport {
 	@Test
 	void greetsTheSignedInUser() throws Exception {
 		AppUser user = createUser(Role.OT_STAFF);
-		mvc.perform(withToken(get("/home"), tokenFor(user)))
+		mvc.perform(withToken(get("/api/home"), tokenFor(user)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.user").value("Test"))
 				.andExpect(jsonPath("$.team").value("OT equipment team"));
@@ -89,9 +89,9 @@ class HomeIntegrationTest extends ApiTestSupport {
 		AppUser user = createUser(Role.OT_STAFF);
 		String token = tokenFor(user);
 		String label = newEquipment(newType(), "inspect", "OT store");
-		mvc.perform(withToken(post("/equipment/" + label + "/inspect"), token)).andExpect(status().isOk());
+		mvc.perform(withToken(post("/api/equipment/" + label + "/inspect"), token)).andExpect(status().isOk());
 
-		String body = mvc.perform(withToken(get("/home"), token)).andReturn().getResponse().getContentAsString();
+		String body = mvc.perform(withToken(get("/api/home"), token)).andReturn().getResponse().getContentAsString();
 		Map<String, String> latest = JsonPath.read(body, "$.activity[0]");
 		assertThat(latest.get("icon")).isEqualTo("clipboard");
 		assertThat(latest.get("detail")).isEqualTo(label + " · Available");
@@ -100,7 +100,7 @@ class HomeIntegrationTest extends ApiTestSupport {
 	}
 
 	private List<Map<String, String>> tasks() throws Exception {
-		String body = mvc.perform(withToken(get("/home"), tokenFor(Role.OT_STAFF)))
+		String body = mvc.perform(withToken(get("/api/home"), tokenFor(Role.OT_STAFF)))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		return JsonPath.read(body, "$.tasks");
 	}

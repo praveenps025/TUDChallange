@@ -14,6 +14,9 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/equiptrack}
     username: ${DB_USERNAME:equiptrack}
     password: ${DB_PASSWORD}
+  web:
+    resources:
+      add-mappings: false # WebConfig serves the React app and its client-side routes
   jpa:
     open-in-view: false
     hibernate:
@@ -26,15 +29,15 @@ spring:
 
 server:
   port: ${PORT:8080}
-  servlet:
-    context-path: /api
   error:
     include-stacktrace: never
     include-message: never
 
+# Everything the backend answers lives under /api; the React app is served at /
 management:
   endpoints:
     web:
+      base-path: /api/actuator
       exposure:
         include: health
   endpoint:
@@ -44,9 +47,10 @@ management:
 
 springdoc:
   swagger-ui:
-    path: /swagger-ui.html
+    path: /api/swagger-ui.html
     enabled: ${SWAGGER_ENABLED:true}
   api-docs:
+    path: /api/v3/api-docs
     enabled: ${SWAGGER_ENABLED:true}
 
 app:
@@ -80,13 +84,17 @@ spring:
       app_timezone: ${app.timezone}
 
 ---
+# Production (Azure App Service). Every value comes from App Service settings
+# or Key Vault; see docs/DEPLOYMENT.md.
 spring:
   config:
     activate:
       on-profile: prod
   datasource:
-    url: ${DB_URL}
+    url: ${DB_URL}           # Azure Postgres needs ?sslmode=require
     username: ${DB_USERNAME}
+server:
+  forward-headers-strategy: framework # behind Azure's HTTPS front end
 springdoc:
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:false}

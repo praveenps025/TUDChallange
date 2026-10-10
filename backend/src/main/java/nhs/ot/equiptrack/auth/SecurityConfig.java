@@ -50,10 +50,11 @@ public class SecurityConfig {
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-						.requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
-						.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-						.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-						.anyRequest().authenticated())
+						.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+						.requestMatchers("/api/actuator/health", "/api/actuator/health/**").permitAll()
+						.requestMatchers("/api/swagger-ui.html", "/api/swagger-ui/**", "/api/v3/api-docs/**").permitAll()
+						.requestMatchers("/api/**").authenticated()
+						.anyRequest().permitAll()) // the React app's files and routes
 				.oauth2ResourceServer(rs -> rs
 						.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
 						.authenticationEntryPoint(unauthorized())

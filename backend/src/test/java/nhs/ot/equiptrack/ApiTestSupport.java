@@ -58,7 +58,7 @@ public abstract class ApiTestSupport {
 	}
 
 	protected String login(String username, String password) throws Exception {
-		String body = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+		String body = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content(json("username", username, "password", password)))
 				.andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsString();

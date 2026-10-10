@@ -89,7 +89,7 @@ public class AuditService {
 	@Transactional
 	public WalkResponse scan(CurrentUser user, String equipmentId) {
 		AuditWalk walk = currentWalk("No audit walk is in progress. Start one first.", true);
-		Equipment item = equipmentService.find(equipmentId);
+		Equipment item = equipmentService.findForUpdate(equipmentId);
 		boolean firstScan = walks.recordScan(walk.getId(), item.getId(), user.id()) > 0;
 		boolean wasMissing = lifecycle.sighted(user, item);
 		if (firstScan && !wasMissing) {

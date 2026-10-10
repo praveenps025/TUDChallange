@@ -64,20 +64,25 @@ public class EquipmentService {
 
 	@Transactional
 	public EquipmentResponse returnItem(CurrentUser user, String label, boolean clean) {
-		Equipment item = find(label);
+		Equipment item = findForUpdate(label);
 		lifecycle.returnItem(user, item, clean);
 		return views.of(item);
 	}
 
 	@Transactional
 	public EquipmentResponse inspect(CurrentUser user, String label) {
-		Equipment item = find(label);
+		Equipment item = findForUpdate(label);
 		lifecycle.inspect(user, item);
 		return views.of(item);
 	}
 
 	public Equipment find(String label) {
 		return equipment.findByLabel(label.trim()).orElseThrow(() -> ApiException.notFound("No equipment with ID " + label));
+	}
+
+	// Use inside a transaction before changing the item
+	public Equipment findForUpdate(String label) {
+		return equipment.findByLabelForUpdate(label.trim()).orElseThrow(() -> ApiException.notFound("No equipment with ID " + label));
 	}
 
 }
