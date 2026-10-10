@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import Icon from "../components/Icon";
 import CameraScanner from "../components/CameraScanner";
 import { AppBar, Loading } from "../components/ui";
 import { post } from "../api";
@@ -17,24 +16,18 @@ export default function Scan() {
   const auditing = params.has("audit");
   const { data: recent } = useApi("/equipment/recent");
   const [id, setId] = useState("");
-  const [batch, setBatch] = useState(false);
   const [error, setError] = useState(null);
-  const [recorded, setRecorded] = useState(null);
   const [busy, setBusy] = useState(false);
 
   async function openItem(label) {
     if (!auditing) return navigate(`/item/${encodeURIComponent(label)}`);
     setError(null);
-    setRecorded(null);
     setBusy(true);
     try {
-      const walk = await post("/audit/scan", { equipmentId: label });
-      if (!batch) return navigate("/audit");
-      setRecorded(`${label} recorded · ${walk.found} of ${walk.total} found`); // batch: stay and scan the next one
-      setId("");
+      await post("/audit/scan", { equipmentId: label });
+      navigate("/audit");
     } catch (e) {
       setError(e);
-    } finally {
       setBusy(false);
     }
   }
@@ -42,7 +35,6 @@ export default function Scan() {
   function scanned(text) {
     const label = text.toUpperCase();
     if (!LABEL.test(label)) {
-      setRecorded(null);
       setError(new Error("That QR code isn't an equipment label."));
       return;
     }
@@ -61,19 +53,11 @@ export default function Scan() {
       <CameraScanner onScan={scanned} paused={busy} />
 
       {error && <div style={{ marginTop: 20 }}><Loading error={error} /></div>}
-      {recorded && <div className="callout" style={{ marginTop: 20 }}><Icon name="check" />{recorded}</div>}
 
       <form className="tools" onSubmit={submit}>
         <input type="text" placeholder="Or type the ID, e.g. CU-024" value={id} onChange={e => setId(e.target.value)} aria-label="Equipment ID" />
         <button className="btn fit">Open</button>
       </form>
-
-      {auditing && (
-        <label className="batch">
-          <span><strong>Batch scan</strong><span className="sub tight">Stay here after each item</span></span>
-          <input type="checkbox" className="switch" checked={batch} onChange={e => setBatch(e.target.checked)} />
-        </label>
-      )}
 
       {recent?.length > 0 && (
         <>

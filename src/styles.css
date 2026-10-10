@@ -135,8 +135,6 @@ button.row { width: 100%; font: inherit; color: inherit; text-align: left; curso
 .camera { display: block; }
 .tools { display: flex; gap: 14px; margin: 20px 0 28px; }
 .tools .btn { font-size: 1.2rem; margin: 0; }
-.batch { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.batch strong { display: block; font-size: 1.1rem; }
 .recent { margin: 28px 0 12px; color: var(--muted); }
 .advice { color: var(--muted); font-size: 1.05rem; margin: 20px 0 40px; }
 
