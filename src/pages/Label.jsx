@@ -17,7 +17,7 @@ export default function Label() {
   const [printError, setPrintError] = useState(null);
 
   useEffect(() => {
-    if (item) QRCode.toString(item.id, { type: "svg", margin: 0, errorCorrectionLevel: "M" }).then(setSvg);
+    if (item) QRCode.toString(item.id, { type: "svg", margin: 2, errorCorrectionLevel: "M" }).then(setSvg);
   }, [item]);
 
   async function print() {
