@@ -4,8 +4,6 @@
 -- The patient and MRN are fictional. "Today" is the hospital's date
 -- (${app_timezone}), not the database session's.
 
-create extension if not exists pgcrypto;
-
 create temporary table seed_today as select (now() at time zone '${app_timezone}')::date as today;
 
 -- ------------------------------------------------------------- equipment
@@ -29,7 +27,8 @@ join location l on l.name = v.location_name;
 -- --------------------------------------------------------------- patient
 
 insert into patient (mrn_hash, mrn_suffix, ward_id, bed, discharge_planned_on)
-select encode(hmac('9990004821', '${mrn_hash_key}', 'sha256'), 'hex'), '4821', l.id, '06', (select today from seed_today)
+-- The real MRN hash needs the secret key, so the app fills it in on startup (DevUserSeeder)
+select rpad('sample-patient-4821', 64, '-'), '4821', l.id, '06', (select today from seed_today)
 from location l where l.name = 'Ward 4C';
 
 -- ----------------------------------------------------------------- loans

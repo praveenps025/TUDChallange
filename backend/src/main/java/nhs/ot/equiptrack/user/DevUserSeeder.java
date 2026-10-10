@@ -11,11 +11,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-// Development logins: two per role, so concurrent use can be tried in two
-// browsers. Passwords come from the environment (.env), never from source.
-// Existing accounts are left alone.
+import nhs.ot.equiptrack.discharge.MrnHasher;
+
+// Sample logins for development and demo servers: two per role, so concurrent
+// use can be tried in two browsers. Passwords come from the environment (.env
+// or App Service settings), never from source. Existing accounts are left alone.
 @Component
-@Profile("dev")
+@Profile({ "dev", "demo" })
 class DevUserSeeder implements ApplicationRunner {
 
 	private static final Logger log = LoggerFactory.getLogger(DevUserSeeder.class);
@@ -24,15 +26,17 @@ class DevUserSeeder implements ApplicationRunner {
 	private final UserRepository users;
 	private final PasswordEncoder encoder;
 	private final JdbcTemplate jdbc;
+	private final MrnHasher mrnHasher;
 	private final String managerPassword;
 	private final String staffPassword;
 
-	DevUserSeeder(UserRepository users, PasswordEncoder encoder, JdbcTemplate jdbc,
+	DevUserSeeder(UserRepository users, PasswordEncoder encoder, JdbcTemplate jdbc, MrnHasher mrnHasher,
 			@Value("${DEV_MANAGER_PASSWORD:}") String managerPassword,
 			@Value("${DEV_STAFF_PASSWORD:}") String staffPassword) {
 		this.users = users;
 		this.encoder = encoder;
 		this.jdbc = jdbc;
+		this.mrnHasher = mrnHasher;
 		this.managerPassword = managerPassword;
 		this.staffPassword = staffPassword;
 	}
@@ -45,6 +49,8 @@ class DevUserSeeder implements ApplicationRunner {
 		seed("sam.patel", "Sam Patel", Role.OT_STAFF, staffPassword, "DEV_STAFF_PASSWORD");
 		seed("riley.chen", "Riley Chen", Role.OT_STAFF, staffPassword, "DEV_STAFF_PASSWORD");
 		attributeSampleData();
+		// The sample patient's fictional MRN, hashed with this server's key
+		jdbc.update("update patient set mrn_hash = ? where mrn_hash = rpad('sample-patient-4821', 64, '-')", mrnHasher.hash("9990004821"));
 	}
 
 	// The Flyway sample data runs before any user exists; credit it to Alex,

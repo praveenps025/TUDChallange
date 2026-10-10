@@ -15,6 +15,11 @@ address — which the phone camera and sign-in rely on.
 GitHub Actions (`.github/workflows/build-and-deploy.yml`) builds the app, runs
 every test, and deploys to App Service on each push to `main`.
 
+**New to Azure or on a student account?** Use the click-by-click portal guide
+[AZURE-STEP-BY-STEP.md](AZURE-STEP-BY-STEP.md). It also covers *demo mode*
+(`SPRING_PROFILES_ACTIVE=prod,demo`), which loads the sample equipment, patient
+and logins on an empty database.
+
 ---
 
 ## 1. Create the Azure resources
@@ -77,7 +82,7 @@ az webapp config appsettings set -g $RG -n $APP --settings \
 
 | Setting | Purpose |
 |---|---|
-| `SPRING_PROFILES_ACTIVE=prod` | **Required.** Without it the app starts in dev mode and loads sample data. |
+| `SPRING_PROFILES_ACTIVE=prod` | **Required.** Without it the app starts in dev mode. `prod,demo` adds sample data and the demo logins (`DEV_MANAGER_PASSWORD`, `DEV_STAFF_PASSWORD`). |
 | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | The database. Azure Postgres needs `?sslmode=require`. |
 | `JWT_SECRET` | Signs sign-in tokens (8-hour sessions). |
 | `MRN_HASH_KEY` | Keyed hash of patient MRNs. Never change after go-live. |

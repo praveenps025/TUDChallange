@@ -72,16 +72,18 @@ app:
     unseen-days: 7                # "Unseen items" task threshold
 
 ---
+# dev: local development. demo: add to prod (SPRING_PROFILES_ACTIVE=prod,demo)
+# to load the same sample data and logins on a demo server. Never use demo
+# for real patients: start real use on a fresh database without it.
 spring:
   config:
     activate:
-      on-profile: dev
+      on-profile: dev | demo
   flyway:
-    # Dev-only seed data lives in its own folder so prod never loads it.
+    # Sample data lives in its own folder so a plain prod install never loads it.
     # Seeds are numbered Vn_1 so they run after migration n and before n+1.
     locations: classpath:db/migration,classpath:db/dev-seed
     placeholders:
-      mrn_hash_key: ${app.mrn.hash-key}
       app_timezone: ${app.timezone}
 
 ---
