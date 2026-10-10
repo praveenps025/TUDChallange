@@ -7,7 +7,7 @@ export function AppBar({ title }) {
   const { user } = useAuth();
   return (
     <header className="appbar">
-      <Link className="mark" to="/" aria-label="Home"><Icon name="scan" /></Link>
+      <Link className="mark logo" to="/" aria-label="CareTrack home"><img src="/logo.png" alt="" /></Link>
       <div>
         <span className="eyebrow">CARETRACK{user && ` · ${firstName(user).toUpperCase()}`}</span>
         <span className="page">{title}</span>

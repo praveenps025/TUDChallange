@@ -31,7 +31,7 @@ export default function Login() {
   return (
     <main className="app login">
       <div className="brand">
-        <span className="mark"><Icon name="scan" /></span>
+        <span className="mark logo"><img src="/logo.png" alt="CareTrack" /></span>
         <span className="eyebrow">CARETRACK</span>
       </div>
       <h1>Sign in</h1>
