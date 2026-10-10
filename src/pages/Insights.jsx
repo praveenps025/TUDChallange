@@ -14,7 +14,6 @@ export default function Insights() {
         <>
           <div className="overview">
             <h2>{data.month} overview</h2>
-            <select aria-label="Period"><option>This month</option><option>Last month</option><option>This year</option></select>
           </div>
 
           <div className="tiles">

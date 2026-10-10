@@ -55,11 +55,8 @@ export default function AuditWalk() {
             <div>
               <p className="found">{audit.found} of {audit.total} found</p>
               <p className="sub">{audit.total - audit.found} items still to check</p>
-              <p className="sub">Saved on this device</p>
             </div>
           </div>
-
-          <div className="callout"><Icon name="cloudoff" />Keep scanning. Changes sync when connected.</div>
 
           <div className="section"><h2 className="strong">Still to find</h2></div>
           <div className="card rows">

@@ -40,7 +40,7 @@ h2 { margin: 0; font-size: 1.15rem; font-weight: 600; }
 .pill.info { background: var(--accent-soft); color: var(--accent); }
 .pill.available { background: var(--ok-bg); color: var(--ok); }
 .pill.issued { background: var(--use-bg); color: var(--use); }
-.pill.inspect, .pill.offline, .pill.conflict { background: var(--warn-bg); color: var(--warn); }
+.pill.inspect { background: var(--warn-bg); color: var(--warn); }
 .pill.missing { background: var(--bad-bg); color: var(--bad); }
 
 /* Section heading row */
@@ -88,21 +88,21 @@ input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px;
 
 /* Camera preview (scan, scan result) */
 .camera { position: relative; margin: 0 -20px; height: 400px; background: linear-gradient(90deg, var(--camera-edge) 5%, var(--camera) 5% 95%, var(--camera-edge) 95%); overflow: hidden; }
-.camera .chair { position: absolute; left: 50%; top: 46px; width: 220px; height: 150px; margin-left: -110px; border-radius: 22px; background: var(--camera-shape); }
-.camera .bench { position: absolute; left: 50%; top: 182px; width: 250px; height: 32px; margin-left: -125px; background: var(--camera-shape); }
-.camera .label { position: absolute; left: 50%; top: 106px; width: 92px; padding: 12px 0 8px; margin-left: -46px; border-radius: 4px; background: #e2e8f0; color: #0f172a;
-                 text-align: center; font-size: 0.7rem; font-weight: 700; }
-.camera .label .icon { display: block; margin: 0 auto 4px; width: 26px; height: 26px; }
-.camera .tag { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); padding: 6px 12px; border-radius: 10px; background: #0b1220; color: #cbd5e1; font-size: 0.8rem; letter-spacing: 0.03em; white-space: nowrap; }
 .camera .frame { position: absolute; left: 50%; top: 84px; width: 240px; height: 240px; margin-left: -120px; border: 3px solid #38bdf8; border-radius: 16px; }
 .camera .frame::after { content: ""; position: absolute; left: 14px; right: 14px; top: 46%; height: 1px; background: #38bdf8; animation: sweep 2.4s ease-in-out infinite alternate; }
 @keyframes sweep { from { top: 12%; } to { top: 88%; } }
-.camera .hint { position: absolute; bottom: 24px; width: 100%; text-align: center; color: #f1f5f9; }
+.camera .hint { position: absolute; bottom: 24px; left: 24px; right: 24px; text-align: center; color: #f1f5f9; }
+.camera.placeholder { height: 340px; }
+.camera.placeholder .frame { top: 40px; width: 200px; height: 200px; margin-left: -100px; opacity: 0.5; }
+.camera.placeholder .frame::after { display: none; }
 
 /* Bottom sheet over the camera */
 .sheet { position: relative; margin: -40px -20px 0; padding: 32px 20px 24px; background: var(--bg); border-radius: 20px 20px 0 0; }
 .sheet::before { content: ""; position: absolute; top: 10px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 4px; background: var(--line); }
 .sheet .close { position: absolute; top: 34px; right: 20px; color: var(--muted); }
+.sheet.plain { margin-top: 0; padding-top: 8px; border-radius: 0; }
+.sheet.plain::before { display: none; }
+.sheet.plain .close { top: 10px; }
 
 /* Toggle switch */
 .switch { appearance: none; width: 52px; height: 30px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; flex: none; }
@@ -133,11 +133,8 @@ button.row { width: 100%; font: inherit; color: inherit; text-align: left; curso
 
 /* ---------- Scan and scan result ---------- */
 .camera { display: block; }
-.camera.short { height: 300px; }
-.camera .label.low { top: 228px; }
 .tools { display: flex; gap: 14px; margin: 20px 0 28px; }
 .tools .btn { font-size: 1.2rem; margin: 0; }
-.tools .torch { width: 78px; flex: none; color: var(--text); }
 .batch { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .batch strong { display: block; font-size: 1.1rem; }
 .recent { margin: 28px 0 12px; color: var(--muted); }

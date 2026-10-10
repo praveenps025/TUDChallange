@@ -40,12 +40,7 @@ export default function ScanResult() {
     <main className="app flush">
       <AppBar title="Scan result" />
 
-      <div className="camera short">
-        <span className="chair" /><span className="bench" />
-        <span className="label"><Icon name="qr" />{id}</span>
-      </div>
-
-      <section className="sheet">
+      <section className="sheet plain">
         <Link className="close" to="/scan" aria-label="Close"><Icon name="close" /></Link>
         {!item ? (
           <>
