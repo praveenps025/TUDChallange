@@ -27,7 +27,7 @@
 //   POST /discharge/:mrn/override           { reason } (staff: request; manager: approve)
 //   GET  /discharge/overrides               pending approvals (managers)
 //   POST /discharge/overrides/:id/approve   { reason } (managers), and /reject
-//   GET  /insights                          monthly overview (managers)
+//   GET  /insights?period=this-month|last-month|this-year   overview (managers)
 //
 //   POST /auth/login                        { username, password } -> { token, expiresAt, user }
 //   GET  /auth/me                           signed-in user
@@ -509,17 +509,25 @@ const routes = {
     return patientResponse(patient);
   },
 
-  "GET /insights": (_, __, me) => {
+  // period: this-month, last-month or this-year (sample loan figures for each)
+  "GET /insights": (_, __, me, { period = "this-month" }) => {
     managerOnly(me);
+    const loans = { "this-month": [12, 9, 86], "last-month": [31, 28, 79], "this-year": [240, 221, 83] }[period];
+    if (!loans) throw new ApiError(400, "Period must be this-month, last-month or this-year");
+    const now = new Date();
+    const month = offset => new Date(now.getFullYear(), now.getMonth() + offset, 1).toLocaleDateString("en-IE", { month: "long" });
     const items = Object.values(equipment);
     const count = (category, ...statuses) => items.filter(e => e.category === category && statuses.includes(e.status)).length;
     return {
-      month: new Date().toLocaleDateString("en-IE", { month: "long" }),
+      period,
+      month: period === "this-year" ? String(now.getFullYear()) : month(period === "last-month" ? -1 : 0),
       tracked: items.length,
       unaccounted: items.filter(e => e.status === "missing").length,
       waitlists: waitlist.length,
       readyToAllocate: withAvailability().filter(r => r.availableNow).length,
-      onTime: 86,
+      issued: loans[0],
+      returned: loans[1],
+      onTime: loans[2],
       categories: [...new Set(TYPES.map(t => t.category))].map(name => {
         const available = count(name, "available");
         const waiting = waitlist.filter(r => TYPES.find(t => t.name === r.type).category === name).length;

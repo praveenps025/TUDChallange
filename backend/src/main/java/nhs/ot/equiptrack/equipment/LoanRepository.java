@@ -25,10 +25,15 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
 	@Query("select l from Loan l where l.returnedAt is null and l.dueAt <= :by order by l.dueAt")
 	List<Loan> findOpenDueBy(Instant by);
 
-	@Query("select count(l) from Loan l where l.returnedAt >= :since")
-	long countReturnedSince(Instant since);
+	// Activity in a period [from, to), for Insights
 
-	@Query("select count(l) from Loan l where l.returnedAt >= :since and l.returnedAt <= l.dueAt")
-	long countReturnedOnTimeSince(Instant since);
+	@Query("select count(l) from Loan l where l.issuedAt >= :from and l.issuedAt < :to")
+	long countIssuedBetween(Instant from, Instant to);
+
+	@Query("select count(l) from Loan l where l.returnedAt >= :from and l.returnedAt < :to")
+	long countReturnedBetween(Instant from, Instant to);
+
+	@Query("select count(l) from Loan l where l.returnedAt >= :from and l.returnedAt < :to and l.returnedAt <= l.dueAt")
+	long countReturnedOnTimeBetween(Instant from, Instant to);
 
 }

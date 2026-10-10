@@ -1,5 +1,6 @@
 package nhs.ot.equiptrack.insights;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
 import java.util.HashMap;
@@ -10,6 +11,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import nhs.ot.equiptrack.common.ApiException;
 import nhs.ot.equiptrack.common.Dates;
 import nhs.ot.equiptrack.equipment.CategoryRepository;
 import nhs.ot.equiptrack.equipment.EquipmentRepository;
@@ -21,9 +23,27 @@ import nhs.ot.equiptrack.waitlist.WaitlistService;
 @Service
 public class InsightsService {
 
-	// onTime is null when nothing has been returned yet this month
-	public record Overview(String month, long tracked, long unaccounted, long waitlists, long readyToAllocate, Integer onTime,
-			List<CategoryRow> categories) {
+	// tracked, unaccounted, waitlists, readyToAllocate and categories are as of now;
+	// issued, returned and onTime cover the chosen period. month is the period's
+	// label ("October", "September", "2026"); onTime is null when nothing was returned.
+	public record Overview(String period, String month, long tracked, long unaccounted, long waitlists, long readyToAllocate,
+			long issued, long returned, Integer onTime, List<CategoryRow> categories) {
+	}
+
+	public enum Period {
+		THIS_MONTH, LAST_MONTH, THIS_YEAR;
+
+		static Period parse(String value) {
+			try {
+				return value == null || value.isBlank() ? THIS_MONTH : valueOf(value.trim().toUpperCase(Locale.ROOT).replace('-', '_'));
+			} catch (IllegalArgumentException e) {
+				throw ApiException.badRequest("Period must be this-month, last-month or this-year");
+			}
+		}
+
+		String value() {
+			return name().toLowerCase(Locale.ROOT).replace('_', '-');
+		}
 	}
 
 	// check = needs inspection or missing; advice may be null
@@ -48,7 +68,8 @@ public class InsightsService {
 	}
 
 	@Transactional(readOnly = true)
-	public Overview overview() {
+	public Overview overview(String periodName) {
+		Period period = Period.parse(periodName);
 		LocalDate today = dates.today();
 		List<WaitlistService.Entry> open = waitlist.list();
 
@@ -68,14 +89,23 @@ public class InsightsService {
 					waiting, advice(available, waiting));
 		}).toList();
 
-		var monthStart = dates.startOf(today.withDayOfMonth(1));
-		long returned = loans.countReturnedSince(monthStart);
-		Integer onTime = returned == 0 ? null
-				: (int) Math.round(100.0 * loans.countReturnedOnTimeSince(monthStart) / returned);
+		LocalDate first = switch (period) {
+			case THIS_MONTH -> today.withDayOfMonth(1);
+			case LAST_MONTH -> today.withDayOfMonth(1).minusMonths(1);
+			case THIS_YEAR -> today.withDayOfYear(1);
+		};
+		Instant from = dates.startOf(first);
+		Instant to = dates.startOf(period == Period.LAST_MONTH ? today.withDayOfMonth(1) : today.plusDays(1));
+		String label = period == Period.THIS_YEAR ? String.valueOf(first.getYear())
+				: first.getMonth().getDisplayName(TextStyle.FULL, Locale.UK);
 
-		return new Overview(today.getMonth().getDisplayName(TextStyle.FULL, Locale.UK), equipment.count(),
-				equipment.countByStatus(EquipmentStatus.MISSING), open.size(),
-				open.stream().filter(WaitlistService.Entry::availableNow).count(), onTime, rows);
+		long returned = loans.countReturnedBetween(from, to);
+		Integer onTime = returned == 0 ? null
+				: (int) Math.round(100.0 * loans.countReturnedOnTimeBetween(from, to) / returned);
+
+		return new Overview(period.value(), label, equipment.count(), equipment.countByStatus(EquipmentStatus.MISSING), open.size(),
+				open.stream().filter(WaitlistService.Entry::availableNow).count(), loans.countIssuedBetween(from, to), returned,
+				onTime, rows);
 	}
 
 	// More requests than stock suggests buying; otherwise move stock to where it is wanted
