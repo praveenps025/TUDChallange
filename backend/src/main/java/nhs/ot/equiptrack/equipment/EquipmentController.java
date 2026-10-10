@@ -37,10 +37,12 @@ class EquipmentController {
 
 	private final EquipmentService service;
 	private final EquipmentRegistry registry;
+	private final EquipmentFinder finder;
 
-	EquipmentController(EquipmentService service, EquipmentRegistry registry) {
+	EquipmentController(EquipmentService service, EquipmentRegistry registry, EquipmentFinder finder) {
 		this.service = service;
 		this.registry = registry;
+		this.finder = finder;
 	}
 
 	@PostMapping
@@ -80,6 +82,17 @@ class EquipmentController {
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size) {
 		return service.search(new EquipmentSearch(status, type, category, pool, search), page, size);
+	}
+
+	// "Find equipment": what can be taken right now. weight is a patient weight
+	// category; items rated for it or a heavier band are listed.
+	@GetMapping("/available")
+	EquipmentFinder.Availability available(
+			@RequestParam(required = false) String category,
+			@RequestParam(required = false) String type,
+			@RequestParam(required = false) String search,
+			@RequestParam(required = false) String weight) {
+		return finder.find(category, type, search, weight);
 	}
 
 	@GetMapping("/recent")

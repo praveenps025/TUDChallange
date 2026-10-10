@@ -7,7 +7,7 @@ import { put } from "../api";
 import useApi from "../useApi";
 
 const SHOWN = [
-  ["poolName", "Funding pool"], ["model", "Model"], ["serialNumber", "Serial number"], ["assetNumber", "Asset number"],
+  ["poolName", "Funding pool"], ["weightLabel", "Weight category"], ["model", "Model"], ["serialNumber", "Serial number"], ["assetNumber", "Asset number"],
   ["assetFlag", "Asset flag"], ["size", "Size"], ["maxUserWeight", "Max user weight"], ["hc21Number", "HC21 number"],
   ["dmlNumber", "DML number"], ["therapist", "Therapist"], ["purchaseDate", "Purchased"], ["lastServiceDate", "Last service"],
   ["comments", "Comments"],
@@ -22,6 +22,8 @@ export default function EquipmentDetail() {
   const [pool, setPool] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+
+  const shown = item && { ...item, weightLabel: item.weightCategory && `${item.weightCategory} (up to ${item.weightMaxKg} kg)` };
 
   function edit() {
     setEditing(detailsFromApi(item));
@@ -73,8 +75,8 @@ export default function EquipmentDetail() {
               <div className="section"><h2 className="strong">Details</h2></div>
               <dl className="card details">
                 <dt>Type</dt><dd>{item.type}</dd>
-                {SHOWN.filter(([key]) => item[key]).map(([key, label]) => (
-                  <Fragment key={key}><dt>{label}</dt><dd>{item[key]}</dd></Fragment>
+                {SHOWN.filter(([key]) => shown[key]).map(([key, label]) => (
+                  <Fragment key={key}><dt>{label}</dt><dd>{shown[key]}</dd></Fragment>
                 ))}
                 <dt>Label</dt><dd>{item.labelPrintedAt ? `Printed ${new Date(item.labelPrintedAt).toLocaleDateString("en-IE")}` : "Not printed yet"}</dd>
               </dl>

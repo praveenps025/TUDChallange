@@ -39,6 +39,9 @@ class ReferenceController {
 	record PoolResponse(String code, String name, String description) {
 	}
 
+	record WeightCategoryResponse(String name, int maxKg) {
+	}
+
 	record CategoryResponse(String name, String icon, List<String> types) {
 	}
 
@@ -49,14 +52,16 @@ class ReferenceController {
 	private final CategoryRepository categories;
 	private final LocationRepository locations;
 	private final EquipmentPoolRepository pools;
+	private final WeightCategoryRepository weights;
 	private final EquipmentRegistry registry;
 
 	ReferenceController(TypeRepository types, CategoryRepository categories, LocationRepository locations,
-			EquipmentPoolRepository pools, EquipmentRegistry registry) {
+			EquipmentPoolRepository pools, WeightCategoryRepository weights, EquipmentRegistry registry) {
 		this.types = types;
 		this.categories = categories;
 		this.locations = locations;
 		this.pools = pools;
+		this.weights = weights;
 		this.registry = registry;
 	}
 
@@ -67,6 +72,12 @@ class ReferenceController {
 	TypeResponse createType(@AuthenticationPrincipal CurrentUser user, @Valid @RequestBody NewTypeRequest request) {
 		return TypeResponse.of(registry.createType(user,
 				new EquipmentRegistry.NewType(request.name(), request.category(), request.labelPrefix(), request.defaultLoanDays())));
+	}
+
+	// Lightest first
+	@GetMapping("/weight-categories")
+	List<WeightCategoryResponse> weightCategories() {
+		return weights.findAllByOrderByMaxKgAsc().stream().map(w -> new WeightCategoryResponse(w.getName(), w.getMaxKg())).toList();
 	}
 
 	@GetMapping("/pools")

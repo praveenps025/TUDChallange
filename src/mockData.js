@@ -3,6 +3,7 @@
 //
 //   GET  /home                              greeting, to-do tasks, recent activity
 //   GET  /equipment?status&type&category&search&page&size   search, paged
+//   GET  /equipment/available?category&type&search&weight   "Find equipment": what can be taken now
 //   GET  /equipment/recent                  items the signed-in user last worked on
 //   GET  /equipment/:id                     one item
 //   POST /equipment/:id/return              { clean: true|false }
@@ -12,7 +13,7 @@
 //   GET  /equipment/:id/details             everything about one item
 //   PUT  /equipment/:id                     edit details (managers) { pool, details }
 //   POST /equipment/:id/label-printed       (managers)
-//   GET  /equipment-types, /categories, /locations?kind=ward, /pools
+//   GET  /equipment-types, /categories, /locations?kind=ward, /pools, /weight-categories
 //   POST /equipment-types                   (managers) { name, category, labelPrefix, defaultLoanDays }
 //   GET  /waitlist                          requests, oldest first
 //   POST /waitlist                          { type, ward, mrn, priority, bed?, note? }
@@ -50,9 +51,19 @@ const POOLS = [
   { code: "WINTER", name: "Winter Initiative", description: "Bought through the Winter Initiative" },
 ];
 
+// Patient weight bands; an item rated for a band suits lighter patients too
+const WEIGHTS = [
+  { name: "Underweight", maxKg: 60 }, { name: "Standard", maxKg: 125 },
+  { name: "Overweight", maxKg: 170 }, { name: "Bariatric", maxKg: 250 },
+];
+const weightOf = name => WEIGHTS.find(w => w.name.toLowerCase() === name?.toLowerCase());
+
 const DETAIL_FIELDS = ["model", "serialNumber", "assetNumber", "assetFlag", "size", "maxUserWeight", "hc21Number", "dmlNumber",
   "therapist", "comments", "purchaseDate", "lastServiceDate"];
-const details = {}; // extra registration details by item ID
+const details = { // extra registration details by item ID
+  "WC-031": { weightCategory: "Overweight" }, "SB-011": { weightCategory: "Bariatric" },
+  ...Object.fromEntries(["CU-024", "CU-009", "CU-031", "WC-018", "WC-026", "SB-006"].map(id => [id, { weightCategory: "Standard" }])),
+};
 
 const LOCATIONS = [
   { name: "OT store", kind: "store" }, { name: "Workshop", kind: "workshop" },
@@ -181,13 +192,16 @@ const patientResponse = patient => ({ ...patient, items: patient.items.map(item)
 function detailsOf(e) {
   const extra = details[e.id] ?? {};
   const pool = POOLS.find(p => p.code === (extra.pool ?? "MAIN"));
+  const weight = weightOf(extra.weightCategory);
   return { ...e, pool: pool.code, poolName: pool.name, labelPrintedAt: extra.labelPrintedAt ?? null,
+    weightCategory: weight?.name ?? null, weightMaxKg: weight?.maxKg ?? null,
     ...Object.fromEntries(DETAIL_FIELDS.map(f => [f, extra[f] ?? null])) };
 }
 
 function checkDetails(d) {
   if (!d?.name?.trim()) throw new ApiError(400, "Enter a name for the item");
   if (d.assetFlag && !["AT+", "AT-"].includes(d.assetFlag)) throw new ApiError(400, "Asset flag must be AT+ or AT-");
+  if (d.weightCategory && !weightOf(d.weightCategory)) throw new ApiError(400, `Unknown weight category ${d.weightCategory}`);
 }
 
 function poolCode(code) {
@@ -297,6 +311,25 @@ const routes = {
   },
 
   // Must come before /equipment/:id
+  "GET /equipment/available": (_, __, ___, { category, type, search, weight }) => {
+    const band = weight && weightOf(weight);
+    if (weight && !band) throw new ApiError(400, `Unknown weight category ${weight}`);
+    const text = search?.trim().toLowerCase();
+    const matches = Object.values(equipment)
+      .filter(e => !category || e.category.toLowerCase() === category.toLowerCase())
+      .filter(e => !type || e.type.toLowerCase() === type.toLowerCase())
+      .filter(e => !text || [e.type, e.category, e.name, e.id].some(v => v.toLowerCase().includes(text)))
+      .filter(e => !band || (weightOf(details[e.id]?.weightCategory)?.maxKg ?? 0) >= band.maxKg);
+    const items = matches.filter(e => e.status === "available")
+      .sort((a, b) => a.location.localeCompare(b.location) || a.id.localeCompare(b.id))
+      .map(e => {
+        const w = weightOf(details[e.id]?.weightCategory);
+        return { id: e.id, name: e.name, type: e.type, category: e.category, location: e.location, weightCategory: w?.name ?? null, maxKg: w?.maxKg ?? null };
+      });
+    const count = status => matches.filter(e => e.status === status).length;
+    return { items, unavailable: { issued: count("issued"), inspect: count("inspect"), missing: count("missing") } };
+  },
+
   "GET /equipment/recent": (_, __, me) => {
     const ids = [...new Set(activity.filter(a => a.by === me.username && a.equipmentId).map(a => a.equipmentId))];
     return ids.slice(0, 5).map(item);
@@ -367,6 +400,8 @@ const routes = {
   },
 
   "GET /pools": () => POOLS,
+
+  "GET /weight-categories": () => WEIGHTS,
 
   "GET /categories": () => [...new Set(TYPES.map(t => t.category))].map(name => ({
     name, icon: TYPES.find(t => t.category === name).icon, types: TYPES.filter(t => t.category === name).map(t => t.name),

@@ -70,6 +70,10 @@ public class Equipment {
 
 	private Instant labelPrintedAt;
 
+	// The heaviest patient band the item is rated for (null if not recorded)
+	@ManyToOne(fetch = FetchType.LAZY)
+	private WeightCategory weightCategory;
+
 	@Version
 	private long version;
 
@@ -77,7 +81,8 @@ public class Equipment {
 	}
 
 	// A newly registered item: in stock and ready to issue
-	Equipment(String labelCode, EquipmentType type, EquipmentPool pool, Location location, EquipmentDetails details, Instant now) {
+	Equipment(String labelCode, EquipmentType type, EquipmentPool pool, Location location, WeightCategory weightCategory,
+			EquipmentDetails details, Instant now) {
 		this.labelCode = labelCode;
 		this.type = type;
 		this.pool = pool;
@@ -85,12 +90,13 @@ public class Equipment {
 		this.status = EquipmentStatus.AVAILABLE;
 		this.statusChangedAt = now;
 		this.lastSeenAt = now;
-		update(details, pool);
+		update(details, pool, weightCategory);
 	}
 
 	// Details only; status and location change through EquipmentLifecycle
-	void update(EquipmentDetails d, EquipmentPool pool) {
+	void update(EquipmentDetails d, EquipmentPool pool, WeightCategory weightCategory) {
 		this.pool = pool;
+		this.weightCategory = weightCategory;
 		this.name = d.name().trim();
 		this.model = trim(d.model());
 		this.serialNumber = trim(d.serialNumber());
@@ -214,6 +220,10 @@ public class Equipment {
 
 	public Instant getLabelPrintedAt() {
 		return labelPrintedAt;
+	}
+
+	public WeightCategory getWeightCategory() {
+		return weightCategory;
 	}
 
 }

@@ -22,7 +22,8 @@ public class EquipmentRegistry {
 	public record DetailsResponse(String id, String name, String type, String category, String pool, String poolName,
 			String status, String location, String note, String model, String serialNumber, String assetNumber,
 			String assetFlag, String size, String maxUserWeight, String hc21Number, String dmlNumber, String therapist,
-			String comments, LocalDate purchaseDate, LocalDate lastServiceDate, Instant labelPrintedAt) {
+			String comments, LocalDate purchaseDate, LocalDate lastServiceDate, Instant labelPrintedAt, String weightCategory,
+			Integer weightMaxKg) {
 	}
 
 	public record NewType(String name, String category, String labelPrefix, Integer defaultLoanDays) {
@@ -36,20 +37,22 @@ public class EquipmentRegistry {
 	private final CategoryRepository categories;
 	private final EquipmentPoolRepository pools;
 	private final LocationRepository locations;
+	private final WeightCategoryRepository weights;
 	private final EquipmentViews views;
 	private final ActivityService activity;
 	private final EquipmentProperties props;
 	private final Dates dates;
 
 	EquipmentRegistry(EquipmentRepository equipment, EquipmentService equipmentService, TypeRepository types,
-			CategoryRepository categories, EquipmentPoolRepository pools, LocationRepository locations, EquipmentViews views,
-			ActivityService activity, EquipmentProperties props, Dates dates) {
+			CategoryRepository categories, EquipmentPoolRepository pools, LocationRepository locations,
+			WeightCategoryRepository weights, EquipmentViews views, ActivityService activity, EquipmentProperties props, Dates dates) {
 		this.equipment = equipment;
 		this.equipmentService = equipmentService;
 		this.types = types;
 		this.categories = categories;
 		this.pools = pools;
 		this.locations = locations;
+		this.weights = weights;
 		this.views = views;
 		this.activity = activity;
 		this.props = props;
@@ -73,7 +76,7 @@ public class EquipmentRegistry {
 
 		int next = equipment.findHighestNumber(type.getLabelPrefix()) + 1;
 		String label = type.getLabelPrefix() + "-" + String.format("%03d", next);
-		Equipment item = equipment.save(new Equipment(label, type, pool, location, details, dates.now()));
+		Equipment item = equipment.save(new Equipment(label, type, pool, location, weight(details.weightCategory()), details, dates.now()));
 		activity.log(ActivityLog.Kind.IN, item.getName() + " registered", label + " · " + location.getName(), user, item.getId());
 		return toDetails(item);
 	}
@@ -81,7 +84,7 @@ public class EquipmentRegistry {
 	@Transactional
 	public DetailsResponse update(CurrentUser user, String label, String poolCode, EquipmentDetails details) {
 		Equipment item = equipmentService.find(label);
-		item.update(details, pool(poolCode));
+		item.update(details, pool(poolCode), weight(details.weightCategory()));
 		activity.log(ActivityLog.Kind.CLIPBOARD, item.getName() + " details updated", item.getLabelCode(), user, item.getId());
 		return toDetails(item);
 	}
@@ -121,6 +124,13 @@ public class EquipmentRegistry {
 		return type;
 	}
 
+	private WeightCategory weight(String name) {
+		if (name == null || name.isBlank()) {
+			return null;
+		}
+		return weights.findByNameIgnoreCase(name.trim()).orElseThrow(() -> ApiException.badRequest("Unknown weight category " + name));
+	}
+
 	private EquipmentPool pool(String code) {
 		return pools.findByCodeIgnoreCase(required(code, "Choose a funding pool"))
 				.orElseThrow(() -> ApiException.badRequest("Unknown funding pool " + code));
@@ -131,7 +141,9 @@ public class EquipmentRegistry {
 		return new DetailsResponse(view.id(), view.name(), view.type(), view.category(), e.getPool().getCode(),
 				e.getPool().getName(), view.status(), view.location(), view.note(), e.getModel(), e.getSerialNumber(),
 				e.getAssetNumber(), e.getAssetFlag(), e.getSize(), e.getMaxUserWeight(), e.getHc21Number(), e.getDmlNumber(),
-				e.getTherapist(), e.getComments(), e.getPurchaseDate(), e.getLastServiceDate(), e.getLabelPrintedAt());
+				e.getTherapist(), e.getComments(), e.getPurchaseDate(), e.getLastServiceDate(), e.getLabelPrintedAt(),
+				e.getWeightCategory() == null ? null : e.getWeightCategory().getName(),
+				e.getWeightCategory() == null ? null : e.getWeightCategory().getMaxKg());
 	}
 
 	private static String required(String value, String message) {

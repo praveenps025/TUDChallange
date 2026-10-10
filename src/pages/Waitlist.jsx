@@ -51,7 +51,12 @@ export default function Waitlist() {
         <>
           <h1>{requests.length} requests waiting</h1>
           <p className="sub">Most urgent first · {ready} can be allocated now</p>
-          {!item && <Link className="btn secondary" style={{ marginTop: 16 }} to="/waitlist/new"><Icon name="plus" />New request</Link>}
+          {!item && (
+            <div className="decision" style={{ marginTop: 16 }}>
+              <Link className="btn secondary" to="/find"><Icon name="search" />Check availability</Link>
+              <Link className="btn secondary" to="/waitlist/new"><Icon name="plus" />New request</Link>
+            </div>
+          )}
 
           {item ? (
             <div className="callout" style={{ margin: "24px 0 20px" }}>

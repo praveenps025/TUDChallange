@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import { AppBar, BottomNav, Loading } from "../components/ui";
 import { firstName, useAuth } from "../auth";
@@ -11,6 +12,8 @@ function greeting() {
 
 export default function Home() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [find, setFind] = useState("");
   const { data, error } = useApi("/home");
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
@@ -21,6 +24,11 @@ export default function Home() {
         <>
           <h1>{greeting()}, {firstName(user)}</h1>
           <p className="sub">{data.team} · {today}</p>
+
+          <form className="search" onSubmit={e => { e.preventDefault(); navigate(find.trim() ? `/find?search=${encodeURIComponent(find.trim())}` : "/find"); }}>
+            <Icon name="search" />
+            <input type="text" placeholder="Find equipment, e.g. wheelchair" value={find} onChange={e => setFind(e.target.value)} aria-label="Find equipment" />
+          </form>
 
           <div className="section"><h2>To do</h2><span className="muted">{data.tasks.length} tasks</span></div>
           <div className="list">

@@ -21,5 +21,6 @@ public record EquipmentDetails(
 		@Size(max = 100, message = "Therapist is too long") String therapist,
 		@Size(max = 2000, message = "Comments are too long") String comments,
 		@PastOrPresent(message = "Purchase date can't be in the future") LocalDate purchaseDate,
-		@PastOrPresent(message = "Last service date can't be in the future") LocalDate lastServiceDate) {
+		@PastOrPresent(message = "Last service date can't be in the future") LocalDate lastServiceDate,
+		String weightCategory) {
 }
