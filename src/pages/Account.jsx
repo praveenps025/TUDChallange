@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import Icon from "../components/Icon";
 import { AppBar, BottomNav, Loading } from "../components/ui";
-import { post } from "../api";
+import { post, usingMock } from "../api";
+import { resetDemoData } from "../mockData";
 import { initials, ROLE_NAMES, useAuth } from "../auth";
 
 export default function Account() {
@@ -43,6 +44,14 @@ export default function Account() {
       </div>
 
       <button className="btn" style={{ marginTop: 16 }} onClick={logout}><Icon name="logout" />Sign out</button>
+      {usingMock && (
+        <button className="btn secondary" onClick={() => {
+          if (!window.confirm("Put all the sample data back as it was at the start?")) return;
+          resetDemoData();
+          logout();
+          window.location.reload();
+        }}><Icon name="sync" />Reset demo data</button>
+      )}
       <p className="sub small">On a shared device, sign out so the next person can sign in.</p>
 
       {user.role === "MANAGER" && (

@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:phone": "vite --mode phone",
     "build": "vite build",
+    "build:demo": "vite build --mode demo",
     "preview": "vite preview"
   },
   "dependencies": {

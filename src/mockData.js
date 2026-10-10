@@ -40,10 +40,27 @@
 // In sample-data mode any password works for the users below.
 import { ApiError } from "./api";
 
+// ---------------------------------------------------------------- dates
+// Sample dates are relative to today, so the demo never looks out of date
+
+const isoDay = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return isoDay(d); };
+const todayIso = () => addDays(0);
+function dayLabel(iso) {
+  if (iso === todayIso()) return "today";
+  if (iso === addDays(-1)) return "yesterday";
+  if (iso === addDays(1)) return "tomorrow";
+  return new Date(`${iso}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short" });
+}
+const dueText = loan => loan.dueOn < todayIso() ? `Overdue since ${dayLabel(loan.dueOn)}` : `Due ${dayLabel(loan.dueOn)}`;
+
+// ---------------------------------------------------------- reference data
+
 const TYPES = [
   { name: "Wheelchair", category: "Wheelchairs", icon: "wheelchair", labelPrefix: "WC", defaultLoanDays: 14 },
   { name: "Pressure cushion", category: "Cushions", icon: "layers", labelPrefix: "CU", defaultLoanDays: 14 },
   { name: "Sliding board", category: "Sliding boards", icon: "layers", labelPrefix: "SB", defaultLoanDays: 14 },
+  { name: "Hoist", category: "Hoists", icon: "layers", labelPrefix: "HO", defaultLoanDays: 28 },
 ];
 
 const POOLS = [
@@ -60,64 +77,139 @@ const WEIGHTS = [
 ];
 const weightOf = name => WEIGHTS.find(w => w.name.toLowerCase() === name?.toLowerCase());
 
-const DETAIL_FIELDS = ["model", "serialNumber", "assetNumber", "assetFlag", "size", "maxUserWeight", "hc21Number", "dmlNumber",
-  "therapist", "comments", "purchaseDate", "lastServiceDate"];
-const details = { // extra registration details by item ID
-  "WC-031": { weightCategory: "Overweight" }, "SB-011": { weightCategory: "Bariatric" },
-  ...Object.fromEntries(["CU-024", "CU-009", "CU-031", "WC-018", "WC-026", "SB-006", "SB-014"].map(id => [id, { weightCategory: "Standard" }])),
-};
-
 const LOCATIONS = [
   { name: "OT store", kind: "store" }, { name: "Workshop", kind: "workshop" },
   ...["Ward 1B", "Ward 2A", "Ward 2B", "Ward 2C", "Ward 3A", "Ward 3B", "Ward 4A", "Ward 4C", "Ward 5A", "Ward 5B", "Ward 6A"]
     .map(name => ({ name, kind: "ward" })),
 ];
 
-const equipment = {
-  "CU-024": { id: "CU-024", name: "Pressure cushion", type: "Pressure cushion", category: "Cushions", status: "issued", location: "Ward 2B", note: "Loaned 28 Sep · Due today" },
-  "CU-009": { id: "CU-009", name: "Pressure cushion", type: "Pressure cushion", category: "Cushions", status: "available", location: "OT store", note: "Checked today" },
-  "CU-031": { id: "CU-031", name: "Pressure cushion", type: "Pressure cushion", category: "Cushions", status: "missing", location: "Ward 3B", note: "Last seen 29 Sep" },
-  "WC-018": { id: "WC-018", name: "Transit wheelchair", type: "Wheelchair", category: "Wheelchairs", status: "missing", location: "Ward 4C", note: "Last seen 30 Sep" },
-  "WC-026": { id: "WC-026", name: "Wheelchair", type: "Wheelchair", category: "Wheelchairs", status: "issued", location: "Ward 5A", note: "Loaned today · Due today" },
-  "WC-031": { id: "WC-031", name: "Wheelchair", type: "Wheelchair", category: "Wheelchairs", status: "available", location: "OT store", note: "Checked 6 Oct" },
-  "SB-011": { id: "SB-011", name: "Sliding board", type: "Sliding board", category: "Sliding boards", status: "inspect", location: "OT store", note: "Returned today · Needs inspection" },
-  "SB-006": { id: "SB-006", name: "Sliding board", type: "Sliding board", category: "Sliding boards", status: "missing", location: "OT store", note: "Last seen 1 Oct" },
-  "SB-014": { id: "SB-014", name: "Sliding board", type: "Sliding board", category: "Sliding boards", status: "issued", location: "Ward 4C", note: "Loaned 3 days ago · Due in 4 days" },
+// ------------------------------------------------------------- equipment
+// Every patient, MRN, serial number and name below is fictional.
+
+const item_ = (id, name, type, status, location, note = "") => {
+  const t = TYPES.find(x => x.name === type);
+  return [id, { id, name, type, category: t.category, status, location, note, homeLoan: false }];
 };
 
-Object.values(equipment).forEach(e => { e.homeLoan = false; });
+const equipment = Object.fromEntries([
+  // Wheelchairs
+  item_("WC-018", "Transit wheelchair", "Wheelchair", "missing", "Ward 4C", "Last seen 10 days ago"),
+  item_("WC-026", "Wheelchair", "Wheelchair", "issued", "Ward 5A"),
+  item_("WC-031", "Wheelchair", "Wheelchair", "available", "OT store", "Checked 4 days ago"),
+  item_("WC-033", "Self-propelled wheelchair", "Wheelchair", "available", "Workshop", "Checked yesterday"),
+  item_("WC-035", "Wheelchair", "Wheelchair", "issued", "Ward 3A"),
+  item_("WC-040", "Bariatric wheelchair", "Wheelchair", "available", "OT store", "Checked today"),
+  item_("WC-041", "Transit wheelchair", "Wheelchair", "inspect", "OT store", "Returned today · Needs inspection"),
+  // Cushions
+  item_("CU-009", "Pressure cushion", "Pressure cushion", "available", "OT store", "Checked today"),
+  item_("CU-024", "Pressure cushion", "Pressure cushion", "issued", "Ward 2B"),
+  item_("CU-031", "Pressure cushion", "Pressure cushion", "missing", "Ward 3B", "Last seen 11 days ago"),
+  item_("CU-044", "Air cushion", "Pressure cushion", "issued", "Ward 6A"),
+  item_("CU-050", "Pressure cushion", "Pressure cushion", "available", "OT store", "Checked 2 days ago"),
+  // Sliding boards
+  item_("SB-006", "Sliding board", "Sliding board", "missing", "OT store", "Last seen 9 days ago"),
+  item_("SB-011", "Sliding board", "Sliding board", "inspect", "OT store", "Returned today · Needs inspection"),
+  item_("SB-014", "Sliding board", "Sliding board", "issued", "Ward 4C"),
+  item_("SB-020", "Curved sliding board", "Sliding board", "available", "Workshop", "Checked 3 days ago"),
+  // Hoists
+  item_("HO-001", "Mobile hoist", "Hoist", "available", "OT store", "Checked yesterday"),
+  item_("HO-002", "Standing hoist", "Hoist", "issued", "Ward 5B"),
+]);
 
-let homeLoans = []; // home loan requests
-let nextHomeLoanId = 1;
+const DETAIL_FIELDS = ["model", "serialNumber", "assetNumber", "assetFlag", "size", "maxUserWeight", "hc21Number", "dmlNumber",
+  "therapist", "comments", "purchaseDate", "lastServiceDate"];
+const details = { // registration details by item ID
+  "WC-018": { weightCategory: "Standard", model: "Lightweight transit", serialNumber: "SN-TR-20418", assetFlag: "AT+", purchaseDate: "2024-03-12" },
+  "WC-026": { weightCategory: "Standard" },
+  "WC-031": { weightCategory: "Overweight", model: "Heavy-duty", serialNumber: "SN-HD-31007", assetNumber: "A-10031", size: "51 x 46 cm", maxUserWeight: "160 kg" },
+  "WC-033": { weightCategory: "Standard", pool: "WINTER", model: "Self-propel", serialNumber: "SN-SP-33090" },
+  "WC-035": { weightCategory: "Standard" },
+  "WC-040": { weightCategory: "Bariatric", pool: "WSU_ASU", model: "Bariatric 66", serialNumber: "SN-BA-40221", maxUserWeight: "250 kg", purchaseDate: "2025-11-02" },
+  "WC-041": { weightCategory: "Standard" },
+  "CU-009": { weightCategory: "Standard" },
+  "CU-024": { weightCategory: "Standard" },
+  "CU-031": { weightCategory: "Standard" },
+  "CU-044": { weightCategory: "Overweight", model: "Alternating air", serialNumber: "SN-AIR-4410" },
+  "CU-050": { weightCategory: "Standard", pool: "BURKITT" },
+  "SB-006": { weightCategory: "Standard" },
+  "SB-011": { weightCategory: "Bariatric" },
+  "SB-014": { weightCategory: "Standard" },
+  "SB-020": { weightCategory: "Overweight" },
+  "HO-001": { weightCategory: "Bariatric", model: "Mobile 200", serialNumber: "SN-HO-00170", lastServiceDate: addDays(-30) },
+  "HO-002": { weightCategory: "Overweight", model: "Sit-to-stand", serialNumber: "SN-HO-00288" },
+};
+
+// Open loans of issued items: when they went out and when they are due back
+const loans = {
+  "WC-026": { issuedOn: addDays(0), dueOn: addDays(0) },
+  "WC-035": { issuedOn: addDays(-20), dueOn: addDays(-3) },          // overdue
+  "CU-024": { issuedOn: addDays(-12), dueOn: addDays(0) },
+  "CU-044": { issuedOn: addDays(-6), dueOn: addDays(8), mrn: "7731" },
+  "SB-014": { issuedOn: addDays(-3), dueOn: addDays(4), mrn: "4821" },
+  "HO-002": { issuedOn: addDays(-9), dueOn: addDays(5), mrn: "5502" },
+};
+
+// ---------------------------------------------------------------- patients
+// plannedToday: due to be discharged today (shows on Home as a discharge check)
+
+const patients = {
+  "4821": { mrn: "4821", ward: "Ward 4C", bed: "06", items: ["WC-018", "SB-014"], override: null, plannedToday: true },
+  "7731": { mrn: "7731", ward: "Ward 6A", bed: "12", items: ["CU-044"], override: null, plannedToday: true },
+  "5502": {
+    mrn: "5502", ward: "Ward 5B", bed: "03", items: ["HO-002"], plannedToday: true,
+    override: { id: 1, reason: "Moving to a nursing home; they will return the hoist this week", status: "requested",
+      requestedBy: "Riley Chen", requestedAt: "09:05", decidedBy: null, decisionReason: null },
+  },
+  "6190": { mrn: "6190", ward: "Ward 2A", bed: "09", items: [], override: null, plannedToday: true },
+  "3317": { mrn: "3317", ward: "Ward 3A", bed: "02", items: [], override: null },
+  "2264": { mrn: "2264", ward: "Ward 2C", bed: "15", items: [], override: null },
+  "5120": { mrn: "5120", ward: "Ward 5B", bed: "07", items: [], override: null },
+  "4410": { mrn: "4410", ward: "Ward 4A", bed: "11", items: [], override: null },
+  "1185": { mrn: "1185", ward: "Ward 1B", bed: "04", items: [], override: null },
+  "6044": { mrn: "6044", ward: "Ward 6A", bed: "05", items: [], override: null },
+};
+let nextOverrideId = 2;
+
+// A home loan already waiting for a manager (patient 7731's air cushion)
+let homeLoans = [
+  { id: 1, status: "requested", mrn: "7731", ward: "Ward 6A", bed: "12", note: "Daughter collecting on Friday",
+    requestedBy: "Sam Patel", requestedAt: "08:40", decidedBy: null, decisionReason: null,
+    items: [{ id: "CU-044", name: "Air cushion", dueOn: addDays(21) }] },
+];
+let nextHomeLoanId = 2;
+
+// ---------------------------------------------------------------- waitlist
 
 let waitlist = [
-  { id: 1, ward: "Ward 3A", type: "Pressure cushion", days: 6, priority: "routine", mrn: null, note: null },
-  { id: 2, ward: "Ward 5B", type: "Wheelchair", days: 5, priority: "soon", mrn: null, note: null },
-  { id: 3, ward: "Ward 2C", type: "Sliding board", days: 4, priority: "urgent", mrn: null, note: null },
-  { id: 4, ward: "Ward 4A", type: "Pressure cushion", days: 3, priority: "soon", mrn: null, note: null },
-  { id: 5, ward: "Ward 1B", type: "Wheelchair", days: 2, priority: "routine", mrn: null, note: null },
-  { id: 6, ward: "Ward 6A", type: "Pressure cushion", days: 1, priority: "routine", mrn: null, note: null },
+  { id: 1, ward: "Ward 3A", type: "Pressure cushion", days: 6, priority: "routine", mrn: "3317", note: null },
+  { id: 2, ward: "Ward 5B", type: "Wheelchair", days: 5, priority: "soon", mrn: "5120", note: "Needs a narrow chair" },
+  { id: 3, ward: "Ward 2C", type: "Sliding board", days: 4, priority: "urgent", mrn: "2264", note: "Discharge blocked" },
+  { id: 4, ward: "Ward 4A", type: "Pressure cushion", days: 3, priority: "soon", mrn: "4410", note: null },
+  { id: 5, ward: "Ward 1B", type: "Wheelchair", days: 2, priority: "routine", mrn: "1185", note: null },
+  { id: 6, ward: "Ward 6A", type: "Hoist", days: 1, priority: "urgent", mrn: "6044", note: "Pressure-injury risk" },
   { id: 7, ward: "Ward 2A", type: "Wheelchair", days: 1, priority: "routine", mrn: null, note: null },
 ];
 const PRIORITY_ORDER = { urgent: 0, soon: 1, routine: 2 };
 const queue = () => [...waitlist].sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || b.days - a.days || a.id - b.id);
 let nextRequestId = 8;
 
-const activity = [
-  { icon: "in", title: "Sliding board returned", detail: "SB-011 · OT store", time: "09:32", by: "alex.morgan", equipmentId: "SB-011" },
-  { icon: "out", title: "Wheelchair issued", detail: "WC-026 · Ward 5A", time: "09:18", by: "alex.morgan", equipmentId: "WC-026" },
-  { icon: "clipboard", title: "Cushion inspected", detail: "CU-009 · Available", time: "08:56", by: "alex.morgan", equipmentId: "CU-009" },
-];
+// ---------------------------------------------------------------- activity
 
-const patients = {
-  "4821": { mrn: "4821", ward: "Ward 4C", bed: "06", items: ["WC-018", "SB-014"], override: null },
-};
-let nextOverrideId = 1;
+const activity = [
+  { icon: "clipboard", title: "Discharge override requested", detail: "Ward 5B · MRN ••••5502", time: "09:05", by: "riley.chen", equipmentId: null },
+  { icon: "in", title: "Transit wheelchair returned", detail: "WC-041 · OT store", time: "08:58", by: "riley.chen", equipmentId: "WC-041" },
+  { icon: "clipboard", title: "Home loan requested", detail: "1 item · MRN ••••7731", time: "08:40", by: "sam.patel", equipmentId: null },
+  { icon: "in", title: "Sliding board returned", detail: "SB-011 · OT store", time: "08:32", by: "sam.patel", equipmentId: "SB-011" },
+  { icon: "out", title: "Wheelchair issued", detail: "WC-026 · Ward 5A", time: "08:18", by: "sam.patel", equipmentId: "WC-026" },
+  { icon: "clipboard", title: "Pressure cushion inspected", detail: "CU-009 · Available", time: "07:56", by: "alex.morgan", equipmentId: "CU-009" },
+  { icon: "in", title: "Bariatric wheelchair registered", detail: "WC-040 · OT store", time: "07:40", by: "alex.morgan", equipmentId: "WC-040" },
+];
 
 // The audit walk in progress, or null
 let walk = {
   area: "Ward 3 · OT store", started: "09:10", by: "Alex Morgan",
-  expected: ["CU-009", "CU-031", "WC-031", "SB-011", "SB-006"], scanned: ["CU-009", "WC-031", "SB-011"],
+  expected: ["CU-009", "CU-031", "CU-050", "HO-001", "SB-006", "SB-011", "WC-031", "WC-040", "WC-041"],
+  scanned: ["CU-009", "HO-001", "SB-011", "WC-031", "WC-040"],
 };
 
 const users = [
@@ -145,6 +237,10 @@ const log = (me, icon, title, detail, equipmentId = null) =>
 function item(id) {
   const found = equipment[id?.trim().toUpperCase()];
   if (!found) throw new ApiError(404, `No equipment with ID ${id}`);
+  const loan = loans[found.id];
+  if (found.status === "issued" && loan) {
+    found.note = `${found.homeLoan ? "Home loan since" : "Loaned"} ${dayLabel(loan.issuedOn)} · ${dueText(loan)}`;
+  }
   return found;
 }
 
@@ -169,13 +265,16 @@ function returnItem(me, e, clean) {
   if (e.status !== "issued") throw new ApiError(409, `${e.id} is not issued`);
   Object.assign(e, { status: clean ? "available" : "inspect", location: "OT store", homeLoan: false, note: clean ? "Checked today" : "Returned today · Needs inspection" });
   Object.values(patients).forEach(p => { p.items = p.items.filter(id => id !== e.id); });
+  delete loans[e.id];
   log(me, "in", `${e.name} returned`, `${e.id} · OT store`, e.id);
 }
 
 function allocate(me, request, e) {
   if (e.status !== "available" || e.type !== request.type) throw new ApiError(409, `${e.id} can't be allocated to this request`);
   if (request.mrn && patients[request.mrn]) patients[request.mrn].items.push(e.id);
-  Object.assign(e, { status: "issued", location: request.ward, note: "Loaned today · Due in 14 days" });
+  Object.assign(e, { status: "issued", location: request.ward });
+  loans[e.id] = { issuedOn: todayIso(), dueOn: addDays(TYPES.find(t => t.name === e.type)?.defaultLoanDays ?? 14), mrn: request.mrn ?? undefined };
+  item(e.id);
   waitlist = waitlist.filter(r => r !== request);
   log(me, "out", `${e.name} issued`, `${e.id} · ${request.ward}`, e.id);
   return e;
@@ -201,8 +300,6 @@ const patientResponse = patient => ({
   homeLoan: [...homeLoans].reverse().find(r => r.mrn === patient.mrn) ?? null,
 });
 
-const shortDate = iso => new Date(`${iso}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short" });
-
 function lendHome(me, request) {
   const patient = patients[request.mrn];
   request.items.forEach(({ id, dueOn }) => {
@@ -212,7 +309,9 @@ function lendHome(me, request) {
   });
   request.items.forEach(({ id, dueOn }) => {
     const e = item(id);
-    Object.assign(e, { status: "issued", homeLoan: true, location: `Home loan · MRN ••••${patient.mrn}`, note: `Home loan since today · Due ${shortDate(dueOn)}` });
+    Object.assign(e, { status: "issued", homeLoan: true, location: `Home loan · MRN ••••${patient.mrn}` });
+    loans[e.id] = { issuedOn: todayIso(), dueOn, mrn: patient.mrn, home: true };
+    item(e.id);
     if (!patient.items.includes(e.id)) patient.items.push(e.id);
     log(me, "out", `${e.name} sent home on loan`, `${e.id} · MRN ••••${patient.mrn}`, e.id);
   });
@@ -296,23 +395,43 @@ const routes = {
     return null;
   },
 
-  "GET /home": (_, __, me) => ({
-    user: me.name.split(" ")[0],
-    team: me.team,
-    tasks: [
-      { icon: "layers", title: "Allocate pressure cushion", detail: "CU-009 · Ward 3A is next", to: "/waitlist?allocate=CU-009" },
-      { icon: "clock", title: "Loan due", detail: "WC-026 · Ward 5A · Due today", to: "/item/WC-026" },
-      { icon: "eyeoff", title: "Unseen items", detail: "3 items · Last seen over 7 days ago", to: "/audit" },
-      { icon: "clipboard", title: "Discharge check", detail: "Ward 4C · MRN ••••4821", to: "/discharge?mrn=4821" },
-      ...(me.role === "MANAGER" ? Object.values(patients).filter(p => p.override?.status === "requested").map(p => (
-        { icon: "shield", title: "Approve discharge", detail: `${p.ward} · MRN ••••${p.mrn} · asked by ${p.override.requestedBy}`, to: `/discharge?mrn=${p.mrn}` }
-      )) : []),
-      ...(me.role === "MANAGER" ? homeLoans.filter(r => r.status === "requested").map(r => (
-        { icon: "shield", title: "Approve home loan", detail: `${r.items.length} item${r.items.length === 1 ? "" : "s"} · MRN ••••${r.mrn} · asked by ${r.requestedBy}`, to: `/discharge?mrn=${r.mrn}` }
-      )) : []),
-    ],
-    activity: activity.slice(0, 5).map(({ icon, title, detail, time }) => ({ icon, title, detail, time })),
-  }),
+  // Tasks are worked out from the sample data, like the real backend does
+  "GET /home": (_, __, me) => {
+    const tasks = [];
+    const types = new Set();
+    for (const request of queue()) {
+      if (types.has(request.type)) continue;
+      types.add(request.type);
+      const free = Object.values(equipment).find(e => e.type === request.type && e.status === "available");
+      if (free) tasks.push({ icon: "layers", title: `Allocate ${request.type.toLowerCase()}`, detail: `${free.id} · ${request.ward} is next`, to: `/waitlist?allocate=${free.id}` });
+    }
+    Object.entries(loans)
+      .filter(([id, loan]) => equipment[id]?.status === "issued" && loan.dueOn <= todayIso())
+      .sort(([, a], [, b]) => a.dueOn.localeCompare(b.dueOn))
+      .slice(0, 5)
+      .forEach(([id, loan]) => {
+        const where = loan.home ? `Home · MRN ••••${loan.mrn}` : equipment[id].location;
+        const kind = loan.home ? "Home loan" : "Loan";
+        tasks.push({ icon: "clock", title: `${kind} ${loan.dueOn < todayIso() ? "overdue" : "due"}`, detail: `${id} · ${where} · ${dueText(loan)}`, to: `/item/${id}` });
+      });
+    const missing = Object.values(equipment).filter(e => e.status === "missing").length;
+    if (missing) tasks.push({ icon: "eyeoff", title: "Missing items", detail: `${missing} items reported missing · Check on an audit walk`, to: "/audit" });
+    Object.values(patients)
+      .filter(p => p.plannedToday && p.items.some(id => equipment[id].status !== "available" && !equipment[id].homeLoan))
+      .forEach(p => tasks.push({ icon: "clipboard", title: "Discharge check", detail: `${p.ward} · MRN ••••${p.mrn}`, to: `/discharge?mrn=${p.mrn}` }));
+    if (me.role === "MANAGER") {
+      Object.values(patients).filter(p => p.override?.status === "requested").forEach(p => tasks.push(
+        { icon: "shield", title: "Approve discharge", detail: `${p.ward} · MRN ••••${p.mrn} · asked by ${p.override.requestedBy}`, to: `/discharge?mrn=${p.mrn}` }));
+      homeLoans.filter(r => r.status === "requested").forEach(r => tasks.push(
+        { icon: "shield", title: "Approve home loan", detail: `${r.items.length} item${r.items.length === 1 ? "" : "s"} · MRN ••••${r.mrn} · asked by ${r.requestedBy}`, to: `/discharge?mrn=${r.mrn}` }));
+    }
+    return {
+      user: me.name.split(" ")[0],
+      team: me.team,
+      tasks,
+      activity: activity.slice(0, 5).map(({ icon, title, detail, time }) => ({ icon, title, detail, time })),
+    };
+  },
 
   "POST /equipment": (_, { type, pool, location, details: d }, me) => {
     managerOnly(me);
@@ -338,7 +457,8 @@ const routes = {
       .filter(e => !query.type || e.type.toLowerCase() === query.type.toLowerCase())
       .filter(e => !query.category || e.category.toLowerCase() === query.category.toLowerCase())
       .filter(e => !search || e.id.toLowerCase().includes(search) || e.name.toLowerCase().includes(search))
-      .sort((a, b) => a.id.localeCompare(b.id));
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map(e => item(e.id));
     return { items: items.slice(page * size, (page + 1) * size), page, size, total: items.length };
   },
 
@@ -643,6 +763,42 @@ function match(pattern, path) {
   return params;
 }
 
+// ---------------------------------------------------------- saved demo state
+// Changes made in the demo are kept in this browser, so a refresh doesn't undo
+// them. Each browser has its own copy. Account → "Reset demo data" starts over.
+
+const STORAGE_KEY = "caretrack.demo.v1";
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      equipment, details, loans, patients, activity, users, TYPES,
+      homeLoans, nextHomeLoanId, waitlist, nextRequestId, nextOverrideId, walk,
+    }));
+  } catch { /* storage unavailable: the demo still works until the page is reloaded */ }
+}
+
+function refill(target, source) {
+  if (Array.isArray(target)) target.splice(0, target.length, ...source);
+  else { Object.keys(target).forEach(key => delete target[key]); Object.assign(target, source); }
+}
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (!saved) return;
+    [[equipment, saved.equipment], [details, saved.details], [loans, saved.loans], [patients, saved.patients],
+      [activity, saved.activity], [users, saved.users], [TYPES, saved.TYPES]].forEach(([target, source]) => refill(target, source));
+    ({ homeLoans, nextHomeLoanId, waitlist, nextRequestId, nextOverrideId, walk } = saved);
+  } catch { /* unreadable: start from the sample data */ }
+}
+
+export function resetDemoData() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch { /* nothing saved */ }
+}
+
+loadState();
+
 export async function mockRequest(method, path, body = {}, token) {
   await new Promise(resolve => setTimeout(resolve, 250)); // feel like a network call
 
@@ -658,7 +814,11 @@ export async function mockRequest(method, path, body = {}, token) {
   for (const [route, handler] of Object.entries(routes)) {
     const [routeMethod, pattern] = route.split(" ");
     const params = routeMethod === method && match(pattern, pathname);
-    if (params) return structuredClone(handler(params, body ?? {}, me, query));
+    if (params) {
+      const result = structuredClone(handler(params, body ?? {}, me, query));
+      if (method !== "GET") saveState();
+      return result;
+    }
   }
   throw new ApiError(404, `No route for ${method} ${pathname}`);
 }

@@ -15,6 +15,17 @@ export default function Login() {
 
   if (user) return <Navigate to={location.state?.from || "/"} replace />;
 
+  async function demoSignIn(name) {
+    setBusy(true);
+    setError(null);
+    try {
+      await login(name, "demo");
+    } catch (e) {
+      setError(e);
+      setBusy(false);
+    }
+  }
+
   async function submit(event) {
     event.preventDefault();
     setBusy(true);
@@ -54,9 +65,17 @@ export default function Login() {
       </form>
 
       {usingMock && (
-        <p className="sub small" style={{ marginTop: 24 }}>
-          Sample data mode: sign in as <strong>alex.morgan</strong> (manager) or <strong>sam.patel</strong> (OT staff) with any password.
-        </p>
+        <div className="card stack" style={{ marginTop: 28 }}>
+          <strong>Demo with sample data</strong>
+          <p className="sub tight">Nothing here is real. Pick an account to explore:</p>
+          <button type="button" className="btn secondary" disabled={busy} onClick={() => demoSignIn("sam.patel")}>
+            <Icon name="user" />Sign in as OT staff (Sam)
+          </button>
+          <button type="button" className="btn secondary" disabled={busy} onClick={() => demoSignIn("alex.morgan")}>
+            <Icon name="grid" />Sign in as Manager (Alex)
+          </button>
+          <p className="sub small tight">Other demo logins: riley.chen (staff), jordan.lee (manager), any password.</p>
+        </div>
       )}
     </main>
   );

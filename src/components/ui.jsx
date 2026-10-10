@@ -1,6 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import Icon from "./Icon";
 import { firstName, initials, useAuth } from "../auth";
+import { usingMock } from "../api";
 
 // The signed-in name is always visible, so on shared devices staff can see whose session it is
 export function AppBar({ title }) {
@@ -9,7 +10,7 @@ export function AppBar({ title }) {
     <header className="appbar">
       <Link className="mark logo" to="/" aria-label="CareTrack home"><img src="/logo.png" alt="" /></Link>
       <div>
-        <span className="eyebrow">CARETRACK{user && ` · ${firstName(user).toUpperCase()}`}</span>
+        <span className="eyebrow">CARETRACK{usingMock && " · DEMO"}{user && ` · ${firstName(user).toUpperCase()}`}</span>
         <span className="page">{title}</span>
       </div>
       {user && <Link className="avatar" to="/me" aria-label={`Signed in as ${user.name}. Account and sign out`}>{initials(user)}</Link>}
