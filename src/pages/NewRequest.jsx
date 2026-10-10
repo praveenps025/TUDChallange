@@ -42,7 +42,7 @@ export default function NewRequest() {
 
   return (
     <main className="app">
-      <AppBar title="New request" sync={saving ? "saving" : "synced"} />
+      <AppBar title="New request" />
       <h1>Request equipment</h1>
       <p className="sub">The request joins the waitlist. You'll see it allocated when an item comes back.</p>
 

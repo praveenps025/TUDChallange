@@ -62,7 +62,7 @@ export default function RegisterEquipment() {
 
   return (
     <main className="app">
-      <AppBar title="Register" sync={saving ? "saving" : "synced"} />
+      <AppBar title="Register" />
       <h1>Register equipment</h1>
       <p className="sub">The item gets its ID automatically and is ready to issue. Only the name is required.</p>
       {saveError && <div style={{ marginTop: 20 }}><Loading error={saveError} /></div>}

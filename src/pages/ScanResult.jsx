@@ -38,7 +38,7 @@ export default function ScanResult() {
   const action = item && ACTIONS[item.status];
   return (
     <main className="app flush">
-      <AppBar title="Scan result" sync={saving ? "saving" : "synced"} />
+      <AppBar title="Scan result" />
 
       <div className="camera short">
         <span className="chair" /><span className="bench" />

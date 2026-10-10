@@ -47,7 +47,7 @@ export default function Discharge() {
 
   return (
     <main className="app">
-      <AppBar title="Discharge" sync={saving ? "saving" : "synced"} />
+      <AppBar title="Discharge" />
       <h1>Check before discharge</h1>
       <p className="sub">Search by MRN to account for loaned items.</p>
 

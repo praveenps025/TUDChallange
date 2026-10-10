@@ -66,7 +66,7 @@ export default function Users() {
 
   return (
     <main className="app">
-      <AppBar title="Users" sync={saving ? "saving" : "synced"} />
+      <AppBar title="Users" />
       {!users ? <Loading error={error} /> : (
         <>
           <h1>{users.length} users</h1>

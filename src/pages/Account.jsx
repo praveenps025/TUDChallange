@@ -32,7 +32,7 @@ export default function Account() {
 
   return (
     <main className="app">
-      <AppBar title="Account" sync={saving ? "saving" : "synced"} />
+      <AppBar title="Account" />
 
       <div className="card profile">
         <span className="avatar">{initials(user)}</span>

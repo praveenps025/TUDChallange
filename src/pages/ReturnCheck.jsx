@@ -37,7 +37,7 @@ export default function ReturnCheck() {
 
   return (
     <main className="app">
-      <AppBar title="Return check" sync={saving ? "saving" : "synced"} />
+      <AppBar title="Return check" />
       <div className="steps"><span>RETURN · CHECK · ALLOCATE</span><span>2 of 3</span></div>
 
       {!item ? <Loading error={error} /> : item.status !== "issued" ? (

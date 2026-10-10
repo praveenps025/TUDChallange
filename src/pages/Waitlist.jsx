@@ -46,7 +46,7 @@ export default function Waitlist() {
 
   return (
     <main className="app">
-      <AppBar title="Waitlist" sync={saving ? "saving" : "synced"} />
+      <AppBar title="Waitlist" />
       {!requests ? <Loading error={error} /> : (
         <>
           <h1>{requests.length} requests waiting</h1>

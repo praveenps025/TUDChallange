@@ -33,7 +33,6 @@ h2 { margin: 0; font-size: 1.15rem; font-weight: 600; }
 .appbar .mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--accent); color: var(--on-accent); }
 .appbar .eyebrow { display: block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; color: var(--muted); }
 .appbar .page { display: block; font-size: 1.6rem; line-height: 1.15; }
-.appbar .pill { margin-left: auto; }
 
 /* Pills */
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
@@ -216,9 +215,8 @@ select.chip { appearance: auto; }
 /* ---------- Signed-in user (app bar) ---------- */
 .appbar > div { min-width: 0; }
 .appbar .eyebrow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.appbar .avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; flex: none;
+.appbar .avatar { margin-left: auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; flex: none;
                   background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 0.9rem; }
-@media (max-width: 400px) { .appbar .pill { padding: 6px; } .appbar .pill .text { display: none; } }
 
 /* ---------- Forms (login, account, users) ---------- */
 input[type=password], select.input { width: 100%; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card);
@@ -245,6 +243,12 @@ input[type=password]:focus, select.input:focus { outline: 2px solid var(--accent
 .row .pill { flex: none; }
 .editor { margin-top: 12px; }
 .editor h2 { margin-bottom: 4px; }
+
+/* ---------- Find equipment (Home) ---------- */
+.finder { display: grid; gap: 12px; margin-top: 24px; }
+.finder strong { font-size: 1.05rem; }
+.finder .form-grid { gap: 10px; }
+.finder .btn { padding: 13px; }
 
 /* ---------- Waitlist priority ---------- */
 .pill.urgent { background: var(--bad-bg); color: var(--bad); }

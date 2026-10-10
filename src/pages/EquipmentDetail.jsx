@@ -48,7 +48,7 @@ export default function EquipmentDetail() {
 
   return (
     <main className="app">
-      <AppBar title="Equipment" sync={saving ? "saving" : "synced"} />
+      <AppBar title="Equipment" />
       {!item ? <Loading error={error} /> : (
         <>
           <ItemCard item={item}><p className="note">{item.note}</p></ItemCard>

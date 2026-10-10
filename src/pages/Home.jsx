@@ -13,9 +13,18 @@ function greeting() {
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [find, setFind] = useState("");
+  const { data: categories } = useApi("/categories");
+  const { data: weights } = useApi("/weight-categories");
+  const [category, setCategory] = useState("");
+  const [weight, setWeight] = useState("");
   const { data, error } = useApi("/home");
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+
+  function findEquipment(event) {
+    event.preventDefault();
+    const query = new URLSearchParams(Object.entries({ category, weight }).filter(([, v]) => v));
+    navigate(`/find${query.size ? `?${query}` : ""}`);
+  }
 
   return (
     <main className="app">
@@ -25,9 +34,19 @@ export default function Home() {
           <h1>{greeting()}, {firstName(user)}</h1>
           <p className="sub">{data.team} · {today}</p>
 
-          <form className="search" onSubmit={e => { e.preventDefault(); navigate(find.trim() ? `/find?search=${encodeURIComponent(find.trim())}` : "/find"); }}>
-            <Icon name="search" />
-            <input type="text" placeholder="Find equipment, e.g. wheelchair" value={find} onChange={e => setFind(e.target.value)} aria-label="Find equipment" />
+          <form className="card finder" onSubmit={findEquipment}>
+            <strong>Find equipment</strong>
+            <div className="form-grid">
+              <select className="input" value={category} onChange={e => setCategory(e.target.value)} aria-label="Equipment category">
+                <option value="">All categories</option>
+                {categories?.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              </select>
+              <select className="input" value={weight} onChange={e => setWeight(e.target.value)} aria-label="Patient weight">
+                <option value="">Any weight</option>
+                {weights?.map(w => <option key={w.name} value={w.name}>{w.name} (up to {w.maxKg} kg)</option>)}
+              </select>
+            </div>
+            <button className="btn"><Icon name="search" />Find</button>
           </form>
 
           <div className="section"><h2>To do</h2><span className="muted">{data.tasks.length} tasks</span></div>

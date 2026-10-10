@@ -34,7 +34,7 @@ export default function AuditWalk() {
 
   return (
     <main className="app">
-      <AppBar title="Audit walk" sync={saving ? "saving" : "synced"} />
+      <AppBar title="Audit walk" />
       {finished && (
         <div className="callout" style={{ marginBottom: 20 }}>
           <Icon name="check" />
