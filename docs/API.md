@@ -1,4 +1,4 @@
-# EquipTrack OT — Overview & API Contract
+# CareTrack — Overview & API Contract
 
 Mobile-first web app for a hospital OT equipment team to track loaned equipment
 (wheelchairs, pressure cushions, sliding boards): scan → return → check → allocate,

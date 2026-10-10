@@ -1,6 +1,6 @@
-# Deploying EquipTrack OT to Azure
+# Deploying CareTrack to Azure
 
-EquipTrack runs as **one Azure App Service** (Java 21, deployed as code) with
+CareTrack runs as **one Azure App Service** (Java 21, deployed as code) with
 **Azure Database for PostgreSQL – Flexible Server**. The React app is built into
 the backend jar, so the screens (`/`) and the API (`/api`) share one HTTPS
 address — which the phone camera and sign-in rely on.

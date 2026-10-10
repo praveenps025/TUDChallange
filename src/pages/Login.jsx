@@ -32,7 +32,7 @@ export default function Login() {
     <main className="app login">
       <div className="brand">
         <span className="mark"><Icon name="scan" /></span>
-        <span className="eyebrow">EQUIPTRACK OT</span>
+        <span className="eyebrow">CARETRACK</span>
       </div>
       <h1>Sign in</h1>
       <p className="sub">Use your own account, even on a shared device.</p>

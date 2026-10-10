@@ -9,7 +9,7 @@ export function AppBar({ title }) {
     <header className="appbar">
       <Link className="mark" to="/" aria-label="Home"><Icon name="scan" /></Link>
       <div>
-        <span className="eyebrow">EQUIPTRACK OT{user && ` · ${firstName(user).toUpperCase()}`}</span>
+        <span className="eyebrow">CARETRACK{user && ` · ${firstName(user).toUpperCase()}`}</span>
         <span className="page">{title}</span>
       </div>
       {user && <Link className="avatar" to="/me" aria-label={`Signed in as ${user.name}. Account and sign out`}>{initials(user)}</Link>}
