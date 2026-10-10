@@ -42,6 +42,11 @@ public class Loan {
 
 	private Boolean returnedClean;
 
+	// Set when the patient took the item home (a manager approved the home loan)
+	private Instant homeSince;
+
+	private String homeNote;
+
 	protected Loan() {
 	}
 
@@ -59,6 +64,24 @@ public class Loan {
 		this.returnedBy = returnedBy;
 		this.returnedAt = returnedAt;
 		this.returnedClean = clean;
+	}
+
+	void goHome(Instant now, Instant dueAt, String note) {
+		this.homeSince = now;
+		this.dueAt = dueAt;
+		this.homeNote = note;
+	}
+
+	public boolean isHome() {
+		return homeSince != null;
+	}
+
+	public Instant getHomeSince() {
+		return homeSince;
+	}
+
+	public String getHomeNote() {
+		return homeNote;
 	}
 
 	public boolean isOverdue(Instant now) {

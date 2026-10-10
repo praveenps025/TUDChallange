@@ -54,15 +54,18 @@ class ReferenceController {
 	private final EquipmentPoolRepository pools;
 	private final WeightCategoryRepository weights;
 	private final EquipmentRegistry registry;
+	private final EquipmentProperties props;
 
 	ReferenceController(TypeRepository types, CategoryRepository categories, LocationRepository locations,
-			EquipmentPoolRepository pools, WeightCategoryRepository weights, EquipmentRegistry registry) {
+			EquipmentPoolRepository pools, WeightCategoryRepository weights, EquipmentRegistry registry,
+			EquipmentProperties props) {
 		this.types = types;
 		this.categories = categories;
 		this.locations = locations;
 		this.pools = pools;
 		this.weights = weights;
 		this.registry = registry;
+		this.props = props;
 	}
 
 	@PostMapping("/equipment-types")
@@ -107,6 +110,7 @@ class ReferenceController {
 	@GetMapping("/locations")
 	List<LocationResponse> locations(@RequestParam(required = false) String kind) {
 		return locations.findByActiveTrueOrderByKindAscNameAsc().stream()
+				.filter(l -> !l.getName().equals(props.homeLocation()))
 				.filter(l -> kind == null || l.getKind().equalsIgnoreCase(kind))
 				.map(l -> new LocationResponse(l.getName(), l.getKind()))
 				.toList();

@@ -27,6 +27,8 @@
 //   POST /discharge/:mrn/override           { reason } (staff: request; manager: approve)
 //   GET  /discharge/overrides               pending approvals (managers)
 //   POST /discharge/overrides/:id/approve   { reason } (managers), and /reject
+//   POST /home-loans                        { mrn, items: [{ equipmentId, dueOn? }], note? } (staff: request; manager: lend)
+//   GET  /home-loans/pending                (managers), POST /home-loans/:id/approve | /reject { reason }
 //   GET  /insights?period=this-month|last-month|this-year   overview (managers)
 //
 //   POST /auth/login                        { username, password } -> { token, expiresAt, user }
@@ -62,7 +64,7 @@ const DETAIL_FIELDS = ["model", "serialNumber", "assetNumber", "assetFlag", "siz
   "therapist", "comments", "purchaseDate", "lastServiceDate"];
 const details = { // extra registration details by item ID
   "WC-031": { weightCategory: "Overweight" }, "SB-011": { weightCategory: "Bariatric" },
-  ...Object.fromEntries(["CU-024", "CU-009", "CU-031", "WC-018", "WC-026", "SB-006"].map(id => [id, { weightCategory: "Standard" }])),
+  ...Object.fromEntries(["CU-024", "CU-009", "CU-031", "WC-018", "WC-026", "SB-006", "SB-014"].map(id => [id, { weightCategory: "Standard" }])),
 };
 
 const LOCATIONS = [
@@ -80,7 +82,13 @@ const equipment = {
   "WC-031": { id: "WC-031", name: "Wheelchair", type: "Wheelchair", category: "Wheelchairs", status: "available", location: "OT store", note: "Checked 6 Oct" },
   "SB-011": { id: "SB-011", name: "Sliding board", type: "Sliding board", category: "Sliding boards", status: "inspect", location: "OT store", note: "Returned today · Needs inspection" },
   "SB-006": { id: "SB-006", name: "Sliding board", type: "Sliding board", category: "Sliding boards", status: "missing", location: "OT store", note: "Last seen 1 Oct" },
+  "SB-014": { id: "SB-014", name: "Sliding board", type: "Sliding board", category: "Sliding boards", status: "issued", location: "Ward 4C", note: "Loaned 3 days ago · Due in 4 days" },
 };
+
+Object.values(equipment).forEach(e => { e.homeLoan = false; });
+
+let homeLoans = []; // home loan requests
+let nextHomeLoanId = 1;
 
 let waitlist = [
   { id: 1, ward: "Ward 3A", type: "Pressure cushion", days: 6, priority: "routine", mrn: null, note: null },
@@ -102,7 +110,7 @@ const activity = [
 ];
 
 const patients = {
-  "4821": { mrn: "4821", ward: "Ward 4C", bed: "06", items: ["WC-018"], override: null },
+  "4821": { mrn: "4821", ward: "Ward 4C", bed: "06", items: ["WC-018", "SB-014"], override: null },
 };
 let nextOverrideId = 1;
 
@@ -159,7 +167,8 @@ function withAvailability() {
 
 function returnItem(me, e, clean) {
   if (e.status !== "issued") throw new ApiError(409, `${e.id} is not issued`);
-  Object.assign(e, { status: clean ? "available" : "inspect", location: "OT store", note: clean ? "Checked today" : "Returned today · Needs inspection" });
+  Object.assign(e, { status: clean ? "available" : "inspect", location: "OT store", homeLoan: false, note: clean ? "Checked today" : "Returned today · Needs inspection" });
+  Object.values(patients).forEach(p => { p.items = p.items.filter(id => id !== e.id); });
   log(me, "in", `${e.name} returned`, `${e.id} · OT store`, e.id);
 }
 
@@ -187,7 +196,27 @@ function patientFor(mrn) {
   return patient;
 }
 
-const patientResponse = patient => ({ ...patient, items: patient.items.map(item) });
+const patientResponse = patient => ({
+  ...patient, items: patient.items.map(item),
+  homeLoan: [...homeLoans].reverse().find(r => r.mrn === patient.mrn) ?? null,
+});
+
+const shortDate = iso => new Date(`${iso}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short" });
+
+function lendHome(me, request) {
+  const patient = patients[request.mrn];
+  request.items.forEach(({ id, dueOn }) => {
+    const e = item(id);
+    const onThisPatient = e.status === "issued" && patient.items.includes(e.id) && !e.homeLoan;
+    if (e.status !== "available" && !onThisPatient) throw new ApiError(409, `${e.id} can't be lent: it is ${e.status} and not on loan to this patient`);
+  });
+  request.items.forEach(({ id, dueOn }) => {
+    const e = item(id);
+    Object.assign(e, { status: "issued", homeLoan: true, location: `Home loan · MRN ••••${patient.mrn}`, note: `Home loan since today · Due ${shortDate(dueOn)}` });
+    if (!patient.items.includes(e.id)) patient.items.push(e.id);
+    log(me, "out", `${e.name} sent home on loan`, `${e.id} · MRN ••••${patient.mrn}`, e.id);
+  });
+}
 
 function detailsOf(e) {
   const extra = details[e.id] ?? {};
@@ -277,6 +306,9 @@ const routes = {
       { icon: "clipboard", title: "Discharge check", detail: "Ward 4C · MRN ••••4821", to: "/discharge?mrn=4821" },
       ...(me.role === "MANAGER" ? Object.values(patients).filter(p => p.override?.status === "requested").map(p => (
         { icon: "shield", title: "Approve discharge", detail: `${p.ward} · MRN ••••${p.mrn} · asked by ${p.override.requestedBy}`, to: `/discharge?mrn=${p.mrn}` }
+      )) : []),
+      ...(me.role === "MANAGER" ? homeLoans.filter(r => r.status === "requested").map(r => (
+        { icon: "shield", title: "Approve home loan", detail: `${r.items.length} item${r.items.length === 1 ? "" : "s"} · MRN ••••${r.mrn} · asked by ${r.requestedBy}`, to: `/discharge?mrn=${r.mrn}` }
       )) : []),
     ],
     activity: activity.slice(0, 5).map(({ icon, title, detail, time }) => ({ icon, title, detail, time })),
@@ -510,6 +542,42 @@ const routes = {
   },
 
   // period: this-month, last-month or this-year (sample loan figures for each)
+  "POST /home-loans": (_, { mrn, items, note }, me) => {
+    if (!mrn?.trim()) throw new ApiError(400, "Enter the patient's MRN");
+    if (!items?.length) throw new ApiError(400, "Choose at least one item to lend");
+    const patient = patientFor(mrn);
+    if (homeLoans.some(r => r.mrn === patient.mrn && r.status === "requested")) throw new ApiError(409, "A home loan for this patient is already waiting for a manager");
+    const today = new Date().toISOString().slice(0, 10);
+    const request = {
+      id: nextHomeLoanId++, status: "requested", mrn: patient.mrn, ward: patient.ward, bed: patient.bed, note: note?.trim() || null,
+      requestedBy: me.name, requestedAt: now(), decidedBy: null, decisionReason: null,
+      items: items.map(({ equipmentId, dueOn }) => {
+        const e = item(equipmentId);
+        const onThisPatient = e.status === "issued" && patient.items.includes(e.id) && !e.homeLoan;
+        if (e.status !== "available" && !onThisPatient) throw new ApiError(409, `${e.id} can't be lent: it is ${e.status} and not on loan to this patient`);
+        if (dueOn && dueOn < today) throw new ApiError(400, "The return date can't be in the past");
+        const due = dueOn || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+        return { id: e.id, name: e.name, dueOn: due };
+      }),
+    };
+    log(me, "clipboard", "Home loan requested", `${request.items.length} item${request.items.length === 1 ? "" : "s"} · MRN ••••${patient.mrn}`);
+    if (me.role === "MANAGER") {
+      lendHome(me, request);
+      Object.assign(request, { status: "approved", decidedBy: me.name, decisionReason: request.note ?? "Approved by the manager who requested it" });
+    }
+    homeLoans.push(request);
+    return request;
+  },
+
+  "GET /home-loans/pending": (_, __, me) => {
+    managerOnly(me);
+    return homeLoans.filter(r => r.status === "requested");
+  },
+
+  "POST /home-loans/:id/approve": ({ id }, { reason }, me) => decideHomeLoan(me, Number(id), true, reason),
+
+  "POST /home-loans/:id/reject": ({ id }, { reason }, me) => decideHomeLoan(me, Number(id), false, reason),
+
   "GET /insights": (_, __, me, { period = "this-month" }) => {
     managerOnly(me);
     const loans = { "this-month": [12, 9, 86], "last-month": [31, 28, 79], "this-year": [240, 221, 83] }[period];
@@ -539,6 +607,18 @@ const routes = {
     };
   },
 };
+
+function decideHomeLoan(me, id, approve, reason) {
+  managerOnly(me);
+  if (!reason?.trim()) throw new ApiError(400, "A reason is required");
+  const request = homeLoans.find(r => r.id === id);
+  if (!request) throw new ApiError(404, "Home loan request not found");
+  if (request.status !== "requested") throw new ApiError(409, `This request has already been ${request.status}`);
+  if (approve) lendHome(me, request);
+  Object.assign(request, { status: approve ? "approved" : "rejected", decidedBy: me.name, decisionReason: reason.trim() });
+  log(me, "clipboard", approve ? "Home loan approved" : "Home loan rejected", `MRN ••••${request.mrn}`);
+  return request;
+}
 
 function decideOverride(me, id, approve, reason) {
   managerOnly(me);

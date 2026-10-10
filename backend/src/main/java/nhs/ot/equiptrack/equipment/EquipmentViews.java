@@ -33,13 +33,19 @@ public class EquipmentViews {
 	}
 
 	private EquipmentResponse toResponse(Equipment e, Loan openLoan) {
+		boolean home = openLoan != null && openLoan.isHome();
+		String location = home && openLoan.getPatient() != null
+				? e.getLocation().getName() + " · MRN ••••" + openLoan.getPatient().getMrnSuffix()
+				: e.getLocation().getName();
 		return new EquipmentResponse(e.getLabelCode(), e.getName(), e.getType().getName(),
-				e.getType().getCategory().getName(), e.getStatus().value(), e.getLocation().getName(), note(e, openLoan));
+				e.getType().getCategory().getName(), e.getStatus().value(), location, note(e, openLoan), home);
 	}
 
 	private String note(Equipment e, Loan loan) {
 		return switch (e.getStatus()) {
-			case ISSUED -> loan == null ? "On loan" : "Loaned " + dates.day(loan.getIssuedAt()) + " · " + due(loan);
+			case ISSUED -> loan == null ? "On loan"
+					: loan.isHome() ? "Home loan since " + dates.day(loan.getHomeSince()) + " · " + due(loan)
+					: "Loaned " + dates.day(loan.getIssuedAt()) + " · " + due(loan);
 			case INSPECT -> "Returned " + dates.day(e.getStatusChangedAt()) + " · Needs inspection";
 			case AVAILABLE -> "Checked " + dates.day(e.getStatusChangedAt());
 			case MISSING -> "Last seen " + dates.day(e.getLastSeenAt() != null ? e.getLastSeenAt() : e.getStatusChangedAt());

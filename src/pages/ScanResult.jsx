@@ -63,7 +63,10 @@ export default function ScanResult() {
             ) : (
               <button className="btn" onClick={markInspected} disabled={saving}><Icon name={action.icon} />{action.text}</button>
             )}
-            {(item.status === "issued" || item.status === "missing") && (
+            {item.status === "available" && (
+              <Link className="btn secondary" to={`/home-loan/new?item=${item.id}`}><Icon name="out" />Lend for home use</Link>
+            )}
+            {(item.status === "issued" || item.status === "missing") && !item.homeLoan && (
               <Link className="btn secondary" to={`/waitlist/new?type=${encodeURIComponent(item.type)}`}><Icon name="plus" />Request one for a patient</Link>
             )}
             {user.role === "MANAGER" && (

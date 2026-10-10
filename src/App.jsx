@@ -9,6 +9,7 @@ import AuditWalk from "./pages/AuditWalk";
 import Waitlist from "./pages/Waitlist";
 import NewRequest from "./pages/NewRequest";
 import FindEquipment from "./pages/FindEquipment";
+import NewHomeLoan from "./pages/NewHomeLoan";
 import Discharge from "./pages/Discharge";
 import Insights from "./pages/Insights";
 import Account from "./pages/Account";
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/waitlist" element={<Waitlist />} />
           <Route path="/waitlist/new" element={<NewRequest />} />
           <Route path="/find" element={<FindEquipment />} />
+          <Route path="/home-loan/new" element={<NewHomeLoan />} />
           <Route path="/discharge" element={<Discharge />} />
           <Route path="/me" element={<Account />} />
         </Route>

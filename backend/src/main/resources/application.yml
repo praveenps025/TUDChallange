@@ -67,6 +67,7 @@ app:
   timezone: ${APP_TIMEZONE:Europe/Dublin}  # the hospital's zone: "today", due dates, times shown
   equipment:
     return-location: OT store     # where returned items go (a location name)
+    home-location: Home loan      # where items on a home loan are
   home:
     unseen-days: 7                # "Unseen items" task threshold
 

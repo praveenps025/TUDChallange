@@ -16,6 +16,8 @@ import nhs.ot.equiptrack.equipment.EquipmentViews;
 import nhs.ot.equiptrack.equipment.Loan;
 import nhs.ot.equiptrack.equipment.LoanRepository;
 import nhs.ot.equiptrack.equipment.Location;
+import nhs.ot.equiptrack.homeloan.HomeLoanInfo;
+import nhs.ot.equiptrack.homeloan.HomeLoanRepository;
 import nhs.ot.equiptrack.user.AppUser;
 import nhs.ot.equiptrack.user.UserRepository;
 
@@ -38,8 +40,10 @@ public class DischargeService {
 		}
 	}
 
-	// mrn is only ever the last four digits
-	public record PatientResponse(String mrn, String ward, String bed, List<EquipmentResponse> items, OverrideInfo override) {
+	// mrn is only ever the last four digits. Items on a home loan have homeLoan
+	// set and no longer hold the discharge; homeLoan is the latest home loan request.
+	public record PatientResponse(String mrn, String ward, String bed, List<EquipmentResponse> items, OverrideInfo override,
+			HomeLoanInfo homeLoan) {
 	}
 
 	public record PendingOverride(long id, String mrn, String ward, String bed, String reason, String requestedBy,
@@ -53,10 +57,13 @@ public class DischargeService {
 	private final EquipmentViews views;
 	private final ActivityService activity;
 	private final MrnHasher hasher;
+	private final PatientLookup lookup;
+	private final HomeLoanRepository homeLoans;
 	private final Dates dates;
 
 	DischargeService(PatientRepository patients, OverrideRepository overrides, LoanRepository loans, UserRepository users,
-			EquipmentViews views, ActivityService activity, MrnHasher hasher, Dates dates) {
+			EquipmentViews views, ActivityService activity, MrnHasher hasher, PatientLookup lookup, HomeLoanRepository homeLoans,
+			Dates dates) {
 		this.patients = patients;
 		this.overrides = overrides;
 		this.loans = loans;
@@ -64,6 +71,8 @@ public class DischargeService {
 		this.views = views;
 		this.activity = activity;
 		this.hasher = hasher;
+		this.lookup = lookup;
+		this.homeLoans = homeLoans;
 		this.dates = dates;
 	}
 
@@ -143,23 +152,8 @@ public class DischargeService {
 		return value == null || value.isBlank() ? null : value.trim();
 	}
 
-	// Staff usually type the last four digits; the full MRN resolves clashes
-	Patient resolve(String mrn) {
-		String digits = MrnHasher.digits(mrn);
-		if (digits.length() < 4) {
-			throw ApiException.badRequest("Enter at least the last 4 digits of the MRN");
-		}
-		if (digits.length() > 4) {
-			return patients.findByMrnHash(hasher.hash(digits)).orElseThrow(DischargeService::notFound);
-		}
-		List<Patient> matches = patients.findByMrnSuffix(digits);
-		if (matches.isEmpty()) {
-			throw notFound();
-		}
-		if (matches.size() > 1) {
-			throw ApiException.conflict("More than one patient has an MRN ending " + digits + ". Enter the full MRN.");
-		}
-		return matches.getFirst();
+	private Patient resolve(String mrn) {
+		return lookup.resolve(mrn);
 	}
 
 	private PatientResponse response(Patient patient) {
@@ -167,12 +161,11 @@ public class DischargeService {
 		OverrideInfo override = overrides.findFirstByPatientIdOrderByRequestedAtDescIdDesc(patient.getId())
 				.map(OverrideInfo::of)
 				.orElse(null);
+		HomeLoanInfo homeLoan = homeLoans.findFirstByPatientIdOrderByRequestedAtDescIdDesc(patient.getId())
+				.map(r -> HomeLoanInfo.of(r, dates))
+				.orElse(null);
 		return new PatientResponse(patient.getMrnSuffix(), patient.getWard() == null ? null : patient.getWard().getName(),
-				patient.getBed(), items, override);
-	}
-
-	private static ApiException notFound() {
-		return ApiException.notFound("No patient found with that MRN");
+				patient.getBed(), items, override, homeLoan);
 	}
 
 }

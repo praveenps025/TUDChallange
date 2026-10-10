@@ -3,7 +3,6 @@ package nhs.ot.equiptrack.common;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -45,7 +44,8 @@ public class Dates {
 
 	// A loan due on a date runs until the end of that day
 	public Instant endOf(LocalDate date) {
-		return date.atTime(LocalTime.MAX).atZone(zone).toInstant();
+		// 23:59:59, not LocalTime.MAX: Postgres keeps microseconds and would round .999999999 up to midnight
+		return date.atTime(23, 59, 59).atZone(zone).toInstant();
 	}
 
 	public long daysSince(Instant instant) {

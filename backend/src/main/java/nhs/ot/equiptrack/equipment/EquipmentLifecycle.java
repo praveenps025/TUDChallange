@@ -20,6 +20,7 @@ import nhs.ot.equiptrack.discharge.Patient;
 //                                 --return (not clean)-> inspect --inspect--> available
 //   any (not found when an audit walk finishes) -------> missing
 //   missing --scanned on an audit walk---------------> inspect
+//   available or issued to the patient's ward --home loan approved--> issued (at Home loan)
 //
 // Each method runs inside the caller's transaction and logs one activity entry.
 // Two people acting on the same item at once are caught by the @Version
@@ -90,6 +91,31 @@ public class EquipmentLifecycle {
 		item.moveTo(EquipmentStatus.MISSING, item.getLocation(), dates.now());
 		activity.log(ActivityLog.Kind.CLIPBOARD, item.getName() + " reported missing",
 				item.getLabelCode() + " · Expected in " + item.getLocation().getName(), user, item.getId());
+	}
+
+	// A manager approved a home loan. An item already lent to this patient's
+	// ward goes home on the same loan; an available item is issued straight to them.
+	public void sendHome(CurrentUser user, Equipment item, Patient patient, LocalDate dueOn, String note) {
+		Location home = locations.findByName(props.homeLocation())
+				.orElseThrow(() -> new IllegalStateException("Home location not found: " + props.homeLocation()));
+		Loan loan;
+		if (item.getStatus() == EquipmentStatus.AVAILABLE) {
+			loan = issue(user, item, patient.getWard() != null ? patient.getWard() : home, patient, null, dueOn);
+		} else {
+			loan = loans.findOpen(item.getId())
+					.filter(open -> item.getStatus() == EquipmentStatus.ISSUED && !open.isHome() && open.getPatient() != null
+							&& open.getPatient().getId().equals(patient.getId()))
+					.orElseThrow(() -> ApiException.conflict(item.getLabelCode() + " can't be lent: it is " + item.getStatus().value()
+							+ " and not on loan to this patient"));
+		}
+		if (dueOn.isBefore(dates.today())) {
+			throw ApiException.badRequest("The return date can't be in the past");
+		}
+		Instant now = dates.now();
+		loan.goHome(now, dates.endOf(dueOn), note);
+		item.moveTo(EquipmentStatus.ISSUED, home, now);
+		activity.log(ActivityLog.Kind.OUT, item.getName() + " sent home on loan",
+				item.getLabelCode() + " · MRN ••••" + patient.getMrnSuffix(), user, item.getId());
 	}
 
 	// dueOn is optional: staff may set it, otherwise the type's default loan length applies

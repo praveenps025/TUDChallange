@@ -21,7 +21,7 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
 	@Query("select l from Loan l where l.patient.id = :patientId and l.returnedAt is null order by l.issuedAt")
 	List<Loan> findOpenForPatient(long patientId);
 
-	@EntityGraph(attributePaths = { "equipment", "ward" })
+	@EntityGraph(attributePaths = { "equipment", "ward", "patient" })
 	@Query("select l from Loan l where l.returnedAt is null and l.dueAt <= :by order by l.dueAt")
 	List<Loan> findOpenDueBy(Instant by);
 

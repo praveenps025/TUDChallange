@@ -15,6 +15,7 @@ import nhs.ot.equiptrack.auth.CurrentUser;
 import nhs.ot.equiptrack.common.Dates;
 import nhs.ot.equiptrack.discharge.DischargeService;
 import nhs.ot.equiptrack.discharge.PatientRepository;
+import nhs.ot.equiptrack.homeloan.HomeLoanService;
 import nhs.ot.equiptrack.equipment.EquipmentRepository;
 import nhs.ot.equiptrack.equipment.EquipmentStatus;
 import nhs.ot.equiptrack.equipment.EquipmentViews;
@@ -39,6 +40,7 @@ public class HomeService {
 
 	private final WaitlistService waitlist;
 	private final DischargeService discharge;
+	private final HomeLoanService homeLoans;
 	private final EquipmentRepository equipment;
 	private final LoanRepository loans;
 	private final PatientRepository patients;
@@ -47,10 +49,11 @@ public class HomeService {
 	private final Dates dates;
 	private final int unseenDays;
 
-	HomeService(WaitlistService waitlist, DischargeService discharge, EquipmentRepository equipment, LoanRepository loans, PatientRepository patients,
+	HomeService(WaitlistService waitlist, DischargeService discharge, HomeLoanService homeLoans, EquipmentRepository equipment, LoanRepository loans, PatientRepository patients,
 			ActivityService activity, EquipmentViews views, Dates dates, @Value("${app.home.unseen-days}") int unseenDays) {
 		this.waitlist = waitlist;
 		this.discharge = discharge;
+		this.homeLoans = homeLoans;
 		this.equipment = equipment;
 		this.loans = loans;
 		this.patients = patients;
@@ -69,6 +72,7 @@ public class HomeService {
 		addDischarges(tasks);
 		if (user.isManager()) {
 			addApprovals(tasks);
+			addHomeLoanApprovals(tasks);
 		}
 
 		List<Activity> recent = activity.latest(ACTIVITY_COUNT).stream()
@@ -94,8 +98,11 @@ public class HomeService {
 	private void addLoansDue(List<Task> tasks) {
 		loans.findOpenDueBy(dates.endOf(dates.today())).stream().limit(MAX_PER_KIND).forEach(loan -> {
 			String label = loan.getEquipment().getLabelCode();
-			tasks.add(new Task("clock", loan.isOverdue(dates.now()) ? "Loan overdue" : "Loan due",
-					label + " · " + loan.getWard().getName() + " · " + views.due(loan), "/item/" + label));
+			String kind = loan.isHome() ? "Home loan" : "Loan";
+			String where = loan.isHome() && loan.getPatient() != null ? "Home · MRN ••••" + loan.getPatient().getMrnSuffix()
+					: loan.getWard().getName();
+			tasks.add(new Task("clock", kind + (loan.isOverdue(dates.now()) ? " overdue" : " due"),
+					label + " · " + where + " · " + views.due(loan), "/item/" + label));
 		});
 	}
 
@@ -105,6 +112,14 @@ public class HomeService {
 			tasks.add(new Task("eyeoff", "Unseen items",
 					unseen + (unseen == 1 ? " item" : " items") + " · Last seen over " + unseenDays + " days ago", "/audit"));
 		}
+	}
+
+	// Managers: home loans waiting for a decision
+	private void addHomeLoanApprovals(List<Task> tasks) {
+		homeLoans.pending().stream().limit(MAX_PER_KIND).forEach(r ->
+				tasks.add(new Task("shield", "Approve home loan",
+						r.items().size() + (r.items().size() == 1 ? " item" : " items") + " · MRN ••••" + r.mrn() + " · asked by " + r.requestedBy(),
+						"/discharge?mrn=" + r.mrn())));
 	}
 
 	// Managers: discharge overrides waiting for a decision

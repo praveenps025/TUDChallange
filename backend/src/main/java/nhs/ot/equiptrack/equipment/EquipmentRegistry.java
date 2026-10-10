@@ -72,6 +72,7 @@ public class EquipmentRegistry {
 		EquipmentPool pool = pool(poolCode);
 		String where = locationName == null || locationName.isBlank() ? props.returnLocation() : locationName.trim();
 		Location location = locations.findByName(where).filter(Location::isActive)
+				.filter(l -> !l.getName().equals(props.homeLocation()))
 				.orElseThrow(() -> ApiException.badRequest("Unknown location " + where));
 
 		int next = equipment.findHighestNumber(type.getLabelPrefix()) + 1;

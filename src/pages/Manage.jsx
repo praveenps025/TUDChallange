@@ -5,11 +5,13 @@ import useApi from "../useApi";
 
 // Managers only: everything staff don't do, in one place
 export default function Manage() {
-  const { data: approvals } = useApi("/discharge/overrides");
+  const { data: overrides } = useApi("/discharge/overrides");
+  const { data: homeLoans } = useApi("/home-loans/pending");
+  const waiting = (overrides?.length ?? 0) + (homeLoans?.length ?? 0);
   const items = [
     ["/manage/register", "plus", "Register equipment", "Add a new item and print its QR label"],
     ["/manage/inventory", "box", "Inventory", "Find any item, edit details, reprint a label"],
-    ["/manage/approvals", "shield", "Discharge approvals", "Overrides requested by staff", approvals?.length],
+    ["/manage/approvals", "shield", "Approvals", "Home loans and discharge overrides", waiting],
     ["/insights", "chart", "Insights", "Stock, waitlists and returns this month"],
     ["/audit", "route", "Audit walk", "Check what is where"],
     ["/users", "users", "Users", "Add staff, change roles, reset passwords"],
